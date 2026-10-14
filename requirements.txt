@@ -1,0 +1,19 @@
+# HomeMind dependencies
+# NOTE: keep this file ASCII-only. On Windows, pip reads requirements
+# using the system locale (GBK); UTF-8 Chinese comments here will make
+# pip fail with "Could not find a version ... (from versions: none)".
+
+# ---- core (required) ----
+langgraph>=0.2.0
+langchain-core>=0.3.0
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.9.0
+
+# ---- optional (falls back gracefully if missing) ----
+redis>=5.0.0
+httpx>=0.27.0
+
+# ---- dev / test ----
+pytest>=8.0.0
+pytest-asyncio>=0.24.0

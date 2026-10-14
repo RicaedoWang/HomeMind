@@ -1,0 +1,121 @@
+# HomeMind 全套服务编排
+#
+# V0.1 只需要 redis 一个容器即可跑通；
+# mysql / milvus 是为 V0.5 记忆系统预留的，先用 --profile full 才启动：
+#   docker compose --profile full up -d
+#
+# 最小启动：
+#   docker compose up -d
+#   docker compose logs -f api
+
+services:
+  # ---------- 短期记忆（V0.1 必需）----------
+  redis:
+    image: redis:7-alpine
+    container_name: homemind-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---------- 长期结构化记忆（V0.5，对齐 FR-MEM-002）----------
+  mysql:
+    image: mysql:8.0
+    container_name: homemind-mysql
+    profiles: ["full"]
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: homemind
+      MYSQL_DATABASE: homemind
+      MYSQL_USER: homemind
+      MYSQL_PASSWORD: homemind
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ---------- 语义记忆 / RAG 向量库（V0.5+，对齐 FR-MEM-003）----------
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    container_name: homemind-etcd
+    profiles: ["full"]
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
+      ETCD_SNAPSHOT_COUNT: "50000"
+    volumes:
+      - etcd-data:/etcd
+    command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379
+
+  minio:
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    container_name: homemind-minio
+    profiles: ["full"]
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    volumes:
+      - minio-data:/minio_data
+    command: minio server /minio_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  milvus:
+    image: milvusdb/milvus:v2.3.4
+    container_name: homemind-milvus
+    profiles: ["full"]
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    volumes:
+      - milvus-data:/var/lib/milvus
+    ports:
+      - "19530:19530"
+    depends_on:
+      - etcd
+      - minio
+
+  # ---------- 应用服务 ----------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: homemind-api
+    ports:
+      - "8000:8000"
+    environment:
+      HM_ENV: production
+      HM_LOG_LEVEL: INFO
+      HM_USE_MOCK_LLM: "true"
+      HM_REDIS_ENABLED: "true"
+      HM_REDIS_HOST: redis
+      HM_REDIS_PORT: 6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  mysql-data:
+  etcd-data:
+  minio-data:
+  milvus-data:
