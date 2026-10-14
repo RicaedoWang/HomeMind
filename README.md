@@ -70,6 +70,10 @@ pip install -r requirements.txt
 python scripts/demo.py               # V0.1 主链路演示
 python scripts/demo_memory.py        # V0.5 记忆系统能力演示
 python scripts/demo_agent_memory.py  # V0.5 记忆接入 Agent（记忆改变行为）
+python scripts/demo_multi_agent.py   # V0.8 多 Agent 协同（六段）
+python scripts/chat_cli.py           # 交互式命令行：问答式定制家居习惯
+python scripts/run_eval.py           # 端到端评测（49 条用例 + 红线否决）
+python scripts/web_ui.py             # Gradio Web 界面（可视化链路 + 一键评测）
 pytest -q
 ```
 
@@ -359,6 +363,30 @@ python scripts/run_eval.py --real          # 真模型评测（结果不稳定�
 
 ---
 
+## 五之四、Web 演示界面
+
+```bash
+python scripts/web_ui.py          # 打开 http://127.0.0.1:7860
+HM_USE_MOCK_LLM=true python scripts/web_ui.py   # 省钱版，不烧 token
+```
+
+四块面板：
+
+| 面板 | 内容 |
+|---|---|
+| **对话** | 直接说自然语言；高危动作会要求确认，点「回复确认」放行 |
+| **链路追踪** | 每一跳都摊开：记忆召回 → 意图识别 → Supervisor 分派 → 安全护栏 → 各 Agent 执行 → 记忆写入，含 trace_id、耗时、降级标记 |
+| **记忆库** | 实时显示 Agent 记住了什么，可手动刷新 |
+| **一键评测** | 当场跑 49 条用例，报告直接渲染出来，红线没守住会当场标红 |
+
+为什么要把链路摊开：Agent 系统的可解释性就是可信度。黑窗口里吐一句话没人信，
+把中间过程摆出来才敢让人用——**面试演示效果比贴日志强一个数量级**。
+
+界面记忆与 `scripts/chat_cli.py` 共用 `data/homemind.db`，
+网页里记下的习惯，命令行里一样认。
+
+---
+
 ## 六、关键踩坑记录
 
 **LangGraph 不能用 lambda 包 async 节点。**
@@ -378,6 +406,27 @@ graph.add_node("parse", _parse)
 
 **多意图不能因为一个任务待确认就全卡住。**
 "关灯 + 建日程"里，关灯应该马上做，日程才需要确认。
+
+**Gradio 6 砍掉了 Chatbot 的老数据格式。**
+旧写法 `history.append([用户话, 助手话])`（二元组）在 Gradio 6 直接失效——
+新版只接受 messages 格式 `[{"role": "user", "content": ...}]`，
+且 `bubble_full_width` 参数也被移除（`TypeError: unexpected keyword argument`）。
+装依赖时没锁定大版本，踩到就得改代码：
+
+```python
+# ❌ Gradio 4/5 的写法，6.x 报错
+history = history + [[message, answer]]
+chatbot = gr.Chatbot(height=430, bubble_full_width=False)
+
+# ✅ Gradio 6
+history = history + [{"role": "user", "content": message},
+                     {"role": "assistant", "content": answer}]
+chatbot = gr.Chatbot(height=430)
+```
+
+教训：**UI 库的大版本升级不看 changelog 就上，等于给自己埋雷。**
+requirements 里虽然写了 `gradio>=6.0.0`，但代码是按 API 写的——升级后必须跑冒烟，
+静态检查看不出组件参数被删了。
 
 ---
 
