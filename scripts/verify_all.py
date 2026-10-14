@@ -59,9 +59,11 @@ def _summarize(name: str, output: str) -> str:
         "多 Agent": r"## 演示结束",
         "Web 界面": r"UI 构建 OK",
     }
-    if name == "单元测试":
+    if name in ("单元测试", "Web 控制台"):
         hit = re.search(patterns["单元测试"], output)
-        return hit.group(1) if hit else "通过"
+        if hit:
+            return f"{hit.group(1)}（控制台契约全守）" if name == "Web 控制台" else hit.group(1)
+        return "通过"
     if name == "端到端评测":
         hit = re.search(patterns["端到端评测"], output)
         if hit:
@@ -109,6 +111,7 @@ CHECKS = [
     ("记忆系统", [PY, "scripts/demo_memory.py"], True),
     ("主链路", [PY, "scripts/demo.py"], True),
     ("API 冒烟", [PY, "scripts/smoke_api.py"], True),
+    ("Web 控制台", [PY, "-m", "pytest", "tests/test_console.py", "-q"], True),
     ("Git 仓库", ["git", "log", "--oneline", "-1"], False),
 ]
 
