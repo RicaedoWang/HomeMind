@@ -67,13 +67,75 @@
     return { text: `今天 ${pad2(due.getHours())}:${pad2(due.getMinutes())}`, cls: '' };
   }
 
+  // ---------------------------------------------------------- 登录态
+  const TOKEN_KEY = 'hm_token';
+
+  function getToken() { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } }
+  function setToken(t) { try { localStorage.setItem(TOKEN_KEY, t); } catch { /* 隐私模式忽略 */ } }
+  function clearToken() { try { localStorage.removeItem(TOKEN_KEY); } catch { /* 同上 */ } }
+
   async function api(path, body) {
+    const headers = { 'Content-Type': 'application/json' };
+    const token = getToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
     const options = body
-      ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-      : { method: 'GET' };
+      ? { method: 'POST', headers, body: JSON.stringify(body) }
+      : { method: 'GET', headers };
     const res = await fetch(path, options);
+    if (res.status === 401) { clearToken(); showLogin('登录态失效，请重新登录'); throw new Error('unauthorized'); }
     if (!res.ok) throw new Error(`${res.status} ${path}`);
     return res.json();
+  }
+
+  /** 显示登录门禁。没有有效身份时，控制台一个数据都拿不到。 */
+  async function showLogin(errorText) {
+    const box = $('#login');
+    box.hidden = false;
+    if (errorText) {
+      let el = $('#login-error');
+      if (!el) {
+        el = document.createElement('p');
+        el.id = 'login-error';
+        el.className = 'hm-login__error';
+        $('#login-form').after(el);
+      }
+      el.textContent = errorText;
+    }
+    try {
+      const res = await fetch('/api/auth/accounts');
+      const list = (await res.json()).accounts || [];
+      $('#login-accounts').innerHTML = list.map((a) => `
+        <button type="button" class="hm-login__acct" data-user="${esc(a.username)}">
+          <span class="hm-avatar" style="background:${a.role === 'L4' ? 'var(--hm-color-brand)' : 'var(--hm-text-tertiary)'}">${esc(a.name.slice(0, 1))}</span>
+          <div class="hm-listitem__body">
+            <div class="hm-listitem__title">${esc(a.name)} · ${esc(a.family.name)}</div>
+            <div class="hm-listitem__desc">${esc(a.username)} · ${esc(a.city)} · ${esc(a.role)}</div>
+          </div>
+          ${icon('i-chevron-right', 'hm-ico hm-ico--sm')}
+        </button>`).join('');
+      $$('.hm-login__acct').forEach((b) => {
+        b.addEventListener('click', () => {
+          $('#login-user').value = b.dataset.user;
+          $('#login-pass').value = 'demo1234';
+          submitLogin();     // 不用 requestSubmit：老 Safari 不支持，jsdom 也没实现
+        });
+      });
+    } catch { /* 拿不到清单就手填，不阻塞登录 */ }
+  }
+
+  async function doLogin(username, password) {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    if (!res.ok) {
+      showLogin('用户名或密码错误');
+      return false;
+    }
+    setToken((await res.json()).token);
+    $('#login').hidden = true;
+    return true;
   }
 
   // ---------------------------------------------------------- 全局状态
@@ -632,6 +694,7 @@
   }
 
   function renderPages() {
+    if (!store.data) return;   // 没登录时不渲染，别拿 null 去取 tasks
     // 任务页：全部任务（含已完成 / 已取消），可恢复
     const all = store.data.tasks;
     $('#tasks-sub').textContent = `${all.filter((t) => t.status === 'pending').length} 项待办 · ${all.length} 条记录`;
@@ -676,7 +739,19 @@
 
     // 我的
     const schedules = store.data.schedules || [];
+    const v = store.data.viewer || {};
     $('#page-me-body').innerHTML = `
+      <div class="hm-card">
+        <div class="hm-card__title">当前身份</div>
+        <div class="hm-member">
+          <span class="hm-avatar" style="background:var(--hm-color-brand)">${esc((v.name || '?').slice(0, 1))}</span>
+          <div class="hm-listitem__body">
+            <div class="hm-listitem__title">${esc(v.name || '')} · ${esc(v.familyName || '')}</div>
+            <div class="hm-listitem__desc">${esc(v.city || '')} · 权限 ${esc(v.role || '')} · ${esc(v.member_id || '')}</div>
+          </div>
+        </div>
+        <button class="hm-btn hm-btn--ghost" id="btn-logout" style="margin-top:12px">退出登录</button>
+      </div>
       <div class="hm-card">
         <div class="hm-card__title">外观</div>
         <div class="hm-theme-switch">
@@ -722,6 +797,15 @@
     });
     const saved = (() => { try { return localStorage.getItem('hm-theme'); } catch { return null; } })();
     if (saved && saved !== 'dark') $('#page-me-body [data-theme="light"]')?.click();
+
+    const logout = $('#btn-logout');
+    if (logout) {
+      logout.addEventListener('click', async () => {
+        try { await api('/api/auth/logout', {}); } catch { /* 退出本身失败也要清本地 */ }
+        clearToken();
+        await boot();
+      });
+    }
 
     renderHabitsInto($('#page-me-habits'));
   }
@@ -929,17 +1013,35 @@
     if (store.page === 'tasks' || store.page === 'scenes') renderPages();
   }
 
+  async function submitLogin() {
+    const btn = $('#login-submit');
+    btn.disabled = true;
+    btn.textContent = '登录中…';
+    const ok = await doLogin($('#login-user').value.trim(), $('#login-pass').value);
+    btn.disabled = false;
+    btn.textContent = '登录';
+    if (ok) await boot();
+  }
+  $('#login-form').addEventListener('submit', (e) => { e.preventDefault(); submitLogin(); });
+
   async function boot() {
     const saved = (() => { try { return localStorage.getItem('hm-theme'); } catch { return null; } })();
     if (saved) document.documentElement.dataset.theme = saved;
 
     renderSuggestions();
+    if (!getToken()) {
+      // 没有身份就没有"家"——先把门禁摆出来，别让页面停在白屏
+      pushMsg('ai', '先登录，我才知道该给你看哪个家。');
+      await showLogin();
+      return;
+    }
+    $('#login').hidden = true;
     $('#taskhub-list').innerHTML = '<div class="hm-skeleton"></div><div class="hm-skeleton"></div>';
     try {
       await refresh();
       pushMsg('ai', '我是家里的 AI 管家。可以直接说「客厅有点暗」，也可以让我记住你的习惯。');
     } catch {
-      pushMsg('ai', '拿不到后端状态。先跑起来：<code>uvicorn homemind.api.main:app --reload</code>');
+      pushMsg('ai', '拿不到后端状态。先跑起来：<code>python scripts/console_server.py</code>');
     }
   }
 

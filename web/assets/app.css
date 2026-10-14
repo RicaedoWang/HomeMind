@@ -807,6 +807,49 @@ ul { margin: 0; padding: 0; list-style: none; }
   background: var(--hm-color-danger); margin-left: 6px; vertical-align: middle;
 }
 
+/* ============================ 登录门禁 ============================ */
+
+.hm-login {
+  position: fixed; inset: 0; z-index: 90;
+  display: grid; place-items: center; padding: var(--hm-space-4);
+  background: var(--hm-bg-base);
+}
+.hm-login[hidden] { display: none; }
+.hm-login::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(circle at 50% 0%, rgba(79, 123, 255, 0.18), transparent 60%);
+}
+.hm-login__card {
+  position: relative; width: 100%; max-width: 380px; padding: var(--hm-space-6);
+  border-radius: var(--hm-radius-lg); background: var(--hm-bg-surface);
+  border: 1px solid var(--hm-border-subtle); box-shadow: var(--hm-shadow-float);
+}
+.hm-login__brand {
+  display: flex; align-items: center; gap: var(--hm-space-2);
+  font-size: var(--hm-fs-h2); font-weight: 600;
+}
+.hm-login__sub { margin: 6px 0 var(--hm-space-4); font-size: var(--hm-fs-sm); color: var(--hm-text-tertiary); }
+.hm-login__accounts { display: flex; flex-direction: column; gap: var(--hm-space-2); }
+.hm-login__acct {
+  display: flex; align-items: center; gap: var(--hm-space-3);
+  padding: var(--hm-space-3); border-radius: var(--hm-radius-sm);
+  border: 1px solid var(--hm-border-subtle); background: var(--hm-bg-sunken);
+  transition: border-color var(--hm-dur-instant) var(--hm-ease-standard);
+}
+.hm-login__acct:hover { border-color: var(--hm-color-brand); }
+.hm-login__acct .hm-listitem__body { flex: 1; min-width: 0; text-align: left; }
+.hm-login__acct .hm-listitem__title { font-size: var(--hm-fs-body); }
+.hm-login__acct .hm-listitem__desc { font-size: var(--hm-fs-xs); }
+.hm-login form { display: flex; flex-direction: column; gap: var(--hm-space-3); margin-top: var(--hm-space-4); }
+.hm-login form input {
+  height: 44px; padding: 0 var(--hm-space-4); border-radius: var(--hm-radius-sm);
+  border: 1px solid var(--hm-border-strong); background: var(--hm-bg-sunken); outline: none;
+}
+.hm-login form input:focus { border-color: var(--hm-color-brand); }
+.hm-login .hm-btn { height: 44px; width: 100%; }
+.hm-login__hint { margin: var(--hm-space-3) 0 0; font-size: var(--hm-fs-xs); color: var(--hm-text-tertiary); }
+.hm-login__error { margin: var(--hm-space-2) 0 0; font-size: var(--hm-fs-sm); color: var(--hm-color-danger); }
+
 /* 「问一句」输入框内联态 */
 .hm-envbar__ask {
   display: none;

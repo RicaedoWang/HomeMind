@@ -22,8 +22,12 @@ sys.path.insert(0, str(SRC))
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
+from homemind.api.auth import set_account_store  # noqa: E402
 from homemind.api.console import reset_tasks  # noqa: E402
 from homemind.api.main import app  # noqa: E402
+from homemind.auth.deps import current_user  # noqa: E402
+from homemind.auth.store import AccountStore  # noqa: E402
+from homemind.auth.tokens import AuthUser  # noqa: E402
 from homemind.tools.calendar_server import reset_schedules  # noqa: E402
 from homemind.tools.device_server import reset_devices  # noqa: E402
 
@@ -40,9 +44,21 @@ def _clean():
 
 
 @pytest.fixture()
-def client():
+def client(tmp_path):
+    """受保护接口的客户端：用固定身份旁路认证。
+
+    为什么旁路而不是真去登录：这 8 条测的是"控制台契约"，
+    不是"认证"。每层测试只测一件事，是保持确定性最省事的办法。
+    认证本身的用例在 tests/test_auth.py。
+    """
+    set_account_store(AccountStore(db_path=str(tmp_path / "accounts.db")))
+    app.dependency_overrides[current_user] = lambda: AuthUser(
+        family_id="family_sz", member_id="member_001", role="L4", name="我", city="深圳",
+    )
     with TestClient(app) as c:
         yield c
+    app.dependency_overrides.clear()
+    set_account_store(None)
 
 
 def test_state_contract(client: TestClient) -> None:

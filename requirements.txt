@@ -10,6 +10,10 @@ fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 pydantic>=2.9.0
 
+# ---- auth (login / JWT) ----
+# PyJWT: HS256 signing/verification. Never hand-roll token crypto.
+PyJWT>=2.8.0
+
 # ---- optional (falls back gracefully if missing) ----
 redis>=5.0.0
 httpx>=0.27.0

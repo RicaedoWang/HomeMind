@@ -248,6 +248,24 @@
   </form>
 </section>
 
+<!-- ============================ 登录门禁 ============================ -->
+<div class="hm-login" id="login" hidden>
+  <div class="hm-login__card">
+    <div class="hm-login__brand">
+      <svg class="hm-ico hm-ico--lg" style="color:var(--hm-color-brand)"><use href="#i-sparkle"/></svg>
+      HomeMind
+    </div>
+    <p class="hm-login__sub">选择一个家庭身份登录 · 不同家庭的数据完全隔离</p>
+    <div class="hm-login__accounts" id="login-accounts"></div>
+    <form id="login-form" autocomplete="off">
+      <input id="login-user" placeholder="用户名" aria-label="用户名" />
+      <input id="login-pass" type="password" placeholder="密码" aria-label="密码" />
+      <button type="submit" class="hm-btn hm-btn--primary" id="login-submit">登录</button>
+    </form>
+    <p class="hm-login__hint">演示密码统一为 <b>demo1234</b></p>
+  </div>
+</div>
+
 <script src="/assets/app.js"></script>
 </body>
 </html>

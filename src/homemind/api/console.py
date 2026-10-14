@@ -20,13 +20,16 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from ..agent.graph import build_agent_graph
+from ..auth.deps import current_user
+from ..auth.tokens import AuthUser
 from ..agent.state import initial_state
+from ..auth.store import FAMILIES
 from ..core.trace import get_logger, new_trace_id, set_trace_id
 from ..memory.long_term import LongTermMemory
 from ..memory.service import MemoryService
@@ -266,7 +269,7 @@ def _messages_payload() -> list[dict[str, Any]]:
 
 
 @router.get("/state")
-async def console_state() -> dict[str, Any]:
+async def console_state(user: AuthUser = Depends(current_user)) -> dict[str, Any]:
     """控制台全量状态：一次请求拿齐首页所需数据。"""
     env = _env_payload()
     pending = [t for t in _TASKS if t["status"] == "pending"]
@@ -283,6 +286,9 @@ async def console_state() -> dict[str, Any]:
         "energy": _energy_payload(),
         "messages": _messages_payload(),
         "family": FAMILY,
+        # 身份回显：前端据此显示"谁在看这个家"
+        "viewer": {**user.to_dict(),
+                   "familyName": FAMILIES.get(user.family_id, {}).get("name", user.family_id)},
     }
 
 
@@ -296,8 +302,14 @@ class ControlRequest(BaseModel):
 
 
 @router.post("/devices/{device_id}/control")
-async def control_device(device_id: str, req: ControlRequest) -> dict[str, Any]:
-    """控制设备。走工具注册中心，享受超时/重试/熔断/幂等治理。"""
+async def control_device(
+    device_id: str, req: ControlRequest, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
+    """控制设备。走工具注册中心，享受超时/重试/熔断/幂等治理。
+
+    操作人取自 token（`user.member_id`），**请求体里传的 member_id 一律忽略**——
+    否则谁都能伪造成别人来操作门锁。
+    """
     device = _DEVICES.get(device_id)
     if device is None:
         raise HTTPException(status_code=404, detail="设备不存在")
@@ -335,7 +347,9 @@ class SceneRequest(BaseModel):
 
 
 @router.post("/scenes/{scene_id}/activate")
-async def activate_scene(scene_id: str, req: SceneRequest) -> dict[str, Any]:
+async def activate_scene(
+    scene_id: str, req: SceneRequest, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
     """执行场景：按顺序作用于一组设备，逐项返回回执。"""
     scene = next((s for s in SCENES if s["id"] == scene_id), None)
     if scene is None:
@@ -373,12 +387,14 @@ def _find_task(task_id: str) -> dict[str, Any]:
 
 
 @router.post("/tasks/{task_id}/complete")
-async def complete_task(task_id: str, req: TaskActionRequest) -> dict[str, Any]:
+async def complete_task(
+    task_id: str, req: TaskActionRequest, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
     """完成任务：置为 done，并触发关联设备联动。"""
     task = _find_task(task_id)
     task["status"] = "done"
     task["completedAt"] = datetime.now().isoformat()
-    task["completedBy"] = req.member_id
+    task["completedBy"] = user.member_id
 
     linked: list[dict[str, Any]] = []
     for device_id in task.get("linkedDeviceIds", []):
@@ -398,18 +414,22 @@ async def complete_task(task_id: str, req: TaskActionRequest) -> dict[str, Any]:
 
 
 @router.post("/tasks/{task_id}/cancel")
-async def cancel_task(task_id: str, req: TaskActionRequest) -> dict[str, Any]:
+async def cancel_task(
+    task_id: str, req: TaskActionRequest, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
     """取消任务：保留记录（不物理删除），可追溯。"""
     task = _find_task(task_id)
     task["status"] = "cancelled"
     task["cancelReason"] = req.reason or "未填写原因"
     task["cancelledAt"] = datetime.now().isoformat()
-    task["cancelledBy"] = req.member_id
+    task["cancelledBy"] = user.member_id
     return {"ok": True, "task": task}
 
 
 @router.post("/tasks/{task_id}/reopen")
-async def reopen_task(task_id: str) -> dict[str, Any]:
+async def reopen_task(
+    task_id: str, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
     """撤销：把任务从 done/cancelled 回滚到 pending。"""
     task = _find_task(task_id)
     task["status"] = "pending"
@@ -428,17 +448,20 @@ class AssistantRequest(BaseModel):
 
 
 @router.post("/assistant")
-async def assistant(req: AssistantRequest) -> dict[str, Any]:
+async def assistant(
+    req: AssistantRequest, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
     """AI 助手：走真实 LangGraph 多 Agent 图，返回应答 + 动作卡。
 
     动作卡来自真实工具回执——不是模型编的。模型只负责表达层。
+    member_id 取自 token：AI 记住的偏好是按人存的，身份必须可信。
     """
     trace_id = new_trace_id()
     set_trace_id(trace_id)
 
     state = initial_state(
         user_input=req.text,
-        member_id=req.member_id,
+        member_id=user.member_id,
         confirmed=req.confirmed,
         trace_id=trace_id,
     )
@@ -469,10 +492,14 @@ async def assistant(req: AssistantRequest) -> dict[str, Any]:
 
 
 @router.get("/habits")
-async def habits() -> dict[str, Any]:
-    """Agent 记住的家庭习惯（真实记忆库，非编造）。"""
+async def habits(user: AuthUser = Depends(current_user)) -> dict[str, Any]:
+    """Agent 记住的习惯（真实记忆库，非编造）。
+
+    按登录者自己的 member_id 查，并按其角色做可见性过滤——
+    L1 访客不该看到管理员的偏好。
+    """
     service = MemoryService(long_term=LongTermMemory(db_path="data/homemind.db"))
-    records = service.long_term.list_by_member("member_001", viewer_role="L4")
+    records = service.long_term.list_by_member(user.member_id, viewer_role=user.role)
     return {
         "habits": [{"key": r.memory_key, "value": r.memory_value,
                     "type": r.memory_type, "version": getattr(r, "version", 1)}
