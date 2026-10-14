@@ -10,7 +10,7 @@
 
 | 指标 | 实测值 | 备注 |
 |---|---|---|
-| Python 代码总量 | **7,777 行 / 52 个文件** | `src` + `scripts` + `tests`，由 `verify_all.py` 实时统计 |
+| Python 代码总量 | **7,839 行 / 53 个文件** | `src` + `scripts` + `tests`，由 `verify_all.py` 实时统计 |
 | 单元测试 | **58 passed / 5.6s** | 6 个测试文件（新增 `test_console.py` 8 条），mock 模式确定性执行 |
 | 端到端评测 | **49 条用例，通过率 100%，红线 8/8** | `python scripts/run_eval.py`，含基线对比，实测拦截过一次真实回归 |
 | 一键自检 | **9/9 全绿** | `python scripts/verify_all.py`，一条命令把全部成果跑一遍 |
@@ -22,7 +22,7 @@
 | 大模型 | **真模型已打通** | DeepSeek（OpenAI 兼容协议），Key 存 `.env`，失败自动降级规则 |
 | 记忆库真实数据 | 2 条 | `data/homemind.db`，去重后无冗余 |
 | 交付文档 | 4 份 | SRS + 项目规划 + README + 技术栈清单 |
-| **Git 仓库** | **✅ 33 个模块化提交，工作区干净** | 敏感文件（`.env` / `data/*.db`）未入库，`.gitattributes` 统一换行 |
+| **Git 仓库** | **✅ 34 个模块化提交，工作区干净** | 敏感文件（`.env` / `data/*.db`）未入库，`.gitattributes` 统一换行 |
 
 ### 诚实标注：跑的是降级实现的部分
 
