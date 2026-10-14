@@ -13,6 +13,7 @@
 | Python 代码总量 | **4,530 行** | `src` + `scripts` + `tests` |
 | 单元测试 | **50 passed / 5.72s** | 5 个测试文件，mock 模式确定性执行 |
 | 端到端评测 | **49 条用例，通过率 100%，红线 8/8** | `python scripts/run_eval.py`，含基线对比 |
+| 演示界面 | **Gradio Web（4 面板）** | `python scripts/web_ui.py` → http://127.0.0.1:7860 |
 | 已注册工具 | 5 个 | device_control / device_list / lock_control / create_reminder / list_schedule |
 | 意图类型 | 6 类 | device_control / schedule / knowledge / memory_write / memory_query / chat |
 | 图节点 | 6 个 | recall_memory → parse_intent → safety_gate → execute_tools → respond → write_memory |
@@ -137,8 +138,12 @@ END
 | ~~P0~~ | **初始化 Git + 规范提交历史** | 30 分钟 | ✅ 已完成（11 个规范提交 + gitattributes） |
 | ~~P1~~ | 路线 B · 多 Agent 协同 | 3–4 天 | ✅ 已完成（Supervisor + 3 子 Agent + 冲突检测，实测半天跑通） |
 | ~~P2~~ | 路线 C · 评测体系 | 2 天 | ✅ 已完成（49 用例 + 红线否决 + 基线对比，已实证能拦住回归） |
-| P3 | 路线 A · Gradio 界面 | 1 天 | 演示包装，多 Agent 有界面演示效果翻倍 |
+| ~~P3~~ | 路线 A · Gradio 界面 | 1 天 | ✅ 已完成（对话 + 链路追踪 + 记忆库 + 一键评测四面板） |
 | P4 | 补齐 F4 指代消解 / F2 情景模式 | 各半天 | 便宜的功能点，随手捡 |
+
+**至此 P0–P3 全部完成。** 项目的四个维度都已补齐：
+架构（多 Agent）、安全（护栏 + 红线评测）、质量证据（49 条评测 + 50 单测）、表达（Web 界面）。
+剩下 P4 属于锦上添花，性价比不高——面试时主动说明"我知道这条边界在哪"反而加分。
 
 ---
 
