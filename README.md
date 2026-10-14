@@ -266,7 +266,8 @@ time_decay = exp(-λ × Δt)      λ 默认 0.01/天
 |---|---|---|
 | **V0.1** | 意图识别、多意图拆分、时间解析、MCP 工具注册中心、安全护栏、链路追踪、短期记忆、FastAPI | ✅ 已完成 |
 | **V0.5** | 记忆服务核心 + 接入 Agent 图：写入/召回排序/冲突更新/遗忘/权限隔离/记忆影响参数 | ✅ 已完成 |
-| V0.8 | Supervisor 多 Agent 协同、RAG 知识库、视觉分析、模型分级路由、Milvus 真向量 | 规划中 |
+| **V0.8** | Supervisor 多 Agent 协同、子 Agent 工具白名单、执行前冲突检测、RAG 知识库（本地检索版） | ✅ 已完成 |
+| V0.9 | Milvus 真向量、视觉分析、模型分级路由、多租户隔离 | 规划中 |
 | V1.0 | 评测体系、灰度发布、异常回退、指标监控 | 规划中 |
 
 ### V0.5 记忆系统现状
@@ -282,6 +283,43 @@ time_decay = exp(-λ × Δt)      λ 默认 0.01/天
 | 权限 | 四级角色，召回阶段过滤 | visible_role 字段 |
 
 演示：`python scripts/demo_memory.py`，会跑完写入 → 召回 → 冲突更新 → 权限隔离 → 遗忘 → 衰减六段。
+
+---
+
+## 五之二、V0.8 多 Agent 协同
+
+```
+START → recall_memory → parse_intent → supervisor → safety_gate
+          ─┬─(有分派)→ execute_agents → respond → write_memory → END
+           └─(无分派)→ respond → write_memory → END
+```
+
+三个子 Agent，各管一摊：
+
+| Agent | 领域 | 工具白名单 |
+|---|---|---|
+| `device_agent` | 设备控制 | device_control / device_list / lock_control |
+| `schedule_agent` | 日程提醒 | create_reminder / list_schedule |
+| `knowledge_agent` | 知识问答 | 无（只回答，不碰设备） |
+
+**四条设计原则（面试重点）**：
+
+1. **Supervisor 只做决策，不碰工具。** 它干三件事：分派、冲突检测、并发编排。
+   工具执行仍然统一在 `safety_gate` 之后——**多 Agent 的引入没有削弱安全**，
+   护栏依旧只有唯一一处实现。
+2. **最小权限。** 每个子 Agent 只能调用白名单内的工具。即使 Supervisor 分派错了，
+   日程 Agent 也碰不到门锁。护栏挡"该不该做"，白名单挡"有没有资格做"。
+3. **冲突在执行前拦。** "把客厅灯打开再关掉"两个操作单看都合法，合起来自相矛盾，
+   执行了就是误操作。所以 `detect_conflicts()` 在 supervisor 阶段就把冲突任务挂起，
+   转安全护栏要用户确认。
+4. **失败隔离。** 子 Agent 的 `run()` 永不向外抛异常，崩了就转成 failed outcome，
+   其他 Agent 照常返回结果，主链路不崩。
+
+**治理逻辑只有一份**：主链路和子 Agent 共用 `agent/execution.py` 的执行原语
+（增量解析、记忆补全、幂等键），避免出现"主链路有幂等、子 Agent 没有"这种裂缝。
+
+演示：`python scripts/demo_multi_agent.py`，六段——单领域分派 / 多领域并发 /
+知识问答 / 越权拦截 / 冲突检测 / 失败隔离。
 
 ---
 
