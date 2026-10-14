@@ -394,12 +394,18 @@ HM_USE_MOCK_LLM=true python scripts/web_ui.py   # 省钱版，不烧 token
 ## 五之五、Web 控制台（按《界面设计文档 v1.1》实现）
 
 ```bash
-# 一条命令同时起 API 和 Web（推荐）
-PYTHONPATH=src python -m uvicorn homemind.api.main:app --reload
-# 浏览器打开 http://127.0.0.1:8000
+# 推荐：脚本自己把 src 挂进 sys.path，cmd / PowerShell / Anaconda Prompt 都能跑
+python scripts/console_server.py            # 默认 http://127.0.0.1:8000
+python scripts/console_server.py 8001       # 换端口
+
+# 或者双击项目根目录的 run_console.bat（写死了 homemind 环境的 python 全路径）
+
+# 手机上看：把 127.0.0.1 换成电脑局域网 IP（ipconfig 里的 IPv4 地址）
 ```
 
-手机上看就把地址换成电脑的局域网 IP；桌面端 ≥1280px 自动变三栏（侧栏 + 主内容 + 概览右栏）。
+> ⚠️ 别在 cmd 里写 `PYTHONPATH=src python ...`——那是 bash 语法，cmd 会把
+> PYTHONPATH 当成程序名报「不是内部或外部命令」。PowerShell 也要
+> `$env:PYTHONPATH="src"` 才行。所以推荐直接跑脚本，不碰环境变量。
 
 ### 技术选型：为什么不上 React
 
