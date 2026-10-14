@@ -32,6 +32,8 @@ class AgentState(TypedDict, total=False):
         agent_assignments 多 Agent 分派结果（V0.8，FR-MUL-001）
         agent_results     各子 Agent 的执行结果与 trace（V0.8，FR-MUL-003）
         conflicts         执行前检测到的操作冲突（V0.8，FR-MUL-004）
+        chat_history      最近对话原文（滑动窗口内，V0.9）
+        chat_summary      更早对话的摘要（窗口外压缩产物，V0.9）
     """
 
     trace_id: str
@@ -52,6 +54,8 @@ class AgentState(TypedDict, total=False):
     agent_assignments: list[dict[str, Any]]
     agent_results: list[dict[str, Any]]
     conflicts: list[dict[str, Any]]
+    chat_history: list[dict[str, str]]
+    chat_summary: str
 
 
 def initial_state(
@@ -60,6 +64,8 @@ def initial_state(
     member_role: str = "L4",
     confirmed: bool = False,
     trace_id: str = "-",
+    chat_history: list[dict[str, str]] | None = None,
+    chat_summary: str = "",
 ) -> AgentState:
     """构造初始状态，字段一次性初始化，避免节点里到处 get 默认值。"""
     return {
@@ -78,6 +84,8 @@ def initial_state(
         "confirm_prompt": "",
         "final_answer": "",
         "degraded": False,
+        "chat_history": chat_history or [],
+        "chat_summary": chat_summary or "",
         "agent_assignments": [],
         "agent_results": [],
         "conflicts": [],

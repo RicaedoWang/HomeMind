@@ -81,7 +81,14 @@ async def me(user: AuthUser = Depends(current_user)) -> dict[str, Any]:
 
 @router.post("/logout")
 async def logout(user: AuthUser = Depends(current_user)) -> dict[str, Any]:
-    """登出：服务端留一次审计。JWT 无状态，真正的失效靠前端丢弃 token。"""
+    """登出：清掉该成员的控制台会话记忆，再留一次审计。
+
+    JWT 无状态，真正的失效靠前端丢弃 token；但短期记忆里还留着
+    这个人的对话，换账号前必须清掉，否则下个登录者可能被问出上一家的事。
+    """
+    from ..memory.short_term import get_short_term_memory
+
+    await get_short_term_memory().clear(f"console:{user.member_id}")
     logger.info("logout: %s", user.member_id,
                 extra={"extra_fields": {"event": "auth.logout",
                                         "family_id": user.family_id,

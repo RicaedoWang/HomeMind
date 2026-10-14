@@ -273,3 +273,37 @@ S2 是 S3 的前提（没有租户键就没地方挂两个家的数据）。
 
 **本步发现的 bug（已修）**：`AccountStore.get_password_hash` 漏设 `row_factory`，
 返回元组导致 `TypeError`；修法是把所有连接收口到 `_connect()`，杜绝复发。
+
+### S1.5 · 用户实测反馈的两个 bug 修复 ✅（2026-10-14 晚）
+
+| # | 用户报告 | 根因 | 修复 |
+|---|---|---|---|
+| 1 | 退出登录换账号（我→爸爸），数据还是"我"的 | 前端 `refresh()` 只在任务/场景页重渲染，「我的」页身份卡是旧渲染缓存；退出时对话面板也没清 | 非首页一律重渲染；退出/换号即清对话面板 |
+| 2 | AI 对话没有记忆，问"我刚刚干了什么?"答不上 | `/api/console/assistant` 每轮全新 state，从不写短期记忆也不注入历史 | 接入"**滑动窗口 + 摘要压缩**"模式（见下） |
+
+**多轮记忆实现（按用户指定的模式）**
+
+- 会话按登录者隔离：`console:{member_id}`，请求体传的 session_id 不可信、忽略
+- 每轮：写 user 消息 → 取"窗口内原文 + 窗口外摘要"注入 `AgentState.chat_history / chat_summary` → 图跑完把应答写回
+- 短期记忆新增 `_compress_if_needed`：超过 2×窗口时，溢出部分压成摘要（LLM 优先，mock/失败降级为逐条拼接，**确定性可测**），原文裁到窗口大小
+- `memory_query` 意图分支修通：真模型模式下把记忆清单作为确定事实喂给模型、结合"最近对话"作答（mock 保持纯模板，测试确定性不变）
+
+**测试用例（`tests/test_chat_memory.py` 6 条，总数 75 全绿）**
+
+| 用例 | 契约 |
+|---|---|
+| `test_window_compression_keeps_summary` | 超窗后原文 ≤ 窗口、摘要非空、**最早的溢出消息出现在摘要里（信息不丢）** |
+| `test_no_summary_below_threshold` | 窗口内不触发压缩 |
+| `test_sessions_isolated_per_member` | 两个会话互不可见 |
+| `test_logout_clears_member_session` | 登出清空该成员会话 |
+| `test_assistant_persists_conversation_history` | 连问两轮 → 记忆里 user/assistant 交替四条 |
+| `test_history_reaches_the_graph_state` | 历史真的进入 AgentState 并跑图不崩 |
+
+**真模型四轮实测**（这是单测覆盖不了的部分）：
+
+```
+① 打开窗帘          → 客厅窗帘已经打开了。（动作卡：已打开客厅窗帘）
+② 我刚刚干了什么?    → 你刚刚让我打开了客厅窗帘，已经打开了。 ← 修复前答"我还没记住你的任何习惯"
+③ 我习惯空调开24度   → 记下了
+④ 我有哪些习惯?      → 你目前记下的习惯是：喜欢空调开24度
+```

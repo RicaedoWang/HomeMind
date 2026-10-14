@@ -135,6 +135,9 @@
     }
     setToken((await res.json()).token);
     $('#login').hidden = true;
+    // 换账号 = 新会话：清掉上一个人的对话痕迹，别让 AI 面板还残留旧消息
+    $('#sheet-body').innerHTML = '';
+    $('#sheet-sub').textContent = '意图识别 · 多智能体 · 安全护栏';
     return true;
   }
 
@@ -803,6 +806,7 @@
       logout.addEventListener('click', async () => {
         try { await api('/api/auth/logout', {}); } catch { /* 退出本身失败也要清本地 */ }
         clearToken();
+        $('#sheet-body').innerHTML = '';   // 退出瞬间就清对话，别等下个人登录
         await boot();
       });
     }
@@ -1010,7 +1014,8 @@
     renderDevices();
     renderSummary();
     renderAside();
-    if (store.page === 'tasks' || store.page === 'scenes') renderPages();
+    // 任何非首页都要重渲染：否则切换账号后"我的"页身份卡还是上一个人的渲染缓存
+    if (store.page !== 'home') renderPages();
   }
 
   async function submitLogin() {

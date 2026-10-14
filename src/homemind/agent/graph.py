@@ -266,6 +266,14 @@ async def _llm_generate_answer(state: AgentState, facts: list[str]) -> str | Non
     )
     fact_lines = "\n".join(f"- {f}" for f in facts) if facts else "（本轮没有执行任何设备操作）"
 
+    # 多轮上下文：滑动窗口内的原文 + 窗口外被压缩的摘要。
+    # 有了它，"我刚刚干了什么"才答得上来；没有它，模型对上一轮一无所知。
+    history = state.get("chat_history") or []
+    history_lines = "\n".join(
+        f"{m.get('role', 'user')}: {str(m.get('content', ''))[:160]}" for m in history[-10:]
+    ) or "（这是本次会话的第一句）"
+    summary = (state.get("chat_summary") or "").strip()
+
     system = (
         "你是智能家居助手。说话简短自然，用中文，一两句说完。\n"
         "严格要求：只能基于下面给出的信息回答，不得编造任何没发生过的操作；"
@@ -273,6 +281,9 @@ async def _llm_generate_answer(state: AgentState, facts: list[str]) -> str | Non
     )
     prompt = f"""用户说：{state['user_input']}
 
+最近对话（旧→新）：
+{history_lines}
+{('更早对话摘要：' + summary + chr(10)) if summary else ''}
 这个家庭的记忆：
 {memory_lines}
 {('本次应用了记忆：' + chr(10) + applied_lines) if applied_lines else ''}
@@ -283,7 +294,8 @@ async def _llm_generate_answer(state: AgentState, facts: list[str]) -> str | Non
 请回答用户：
 - 若执行了操作，把结果用自然的话告诉他；用到了记忆就顺带说"按你之前的习惯"。
 - 若用户在询问记忆或习惯，根据"这个家庭的记忆"如实回答。
-- 若用户只是闲聊或提问，正常回应，不要硬扯设备操作。"""
+- 若用户问"刚才/刚刚做了什么"，根据"最近对话"和"刚刚实际执行的结果"如实概括。
+- 若用户只是闲聊或提问，结合对话上下文正常回应，不要硬扯设备操作。"""
 
     result = await client.chat(prompt, system=system, max_tokens=200)
     return result or None
@@ -298,13 +310,23 @@ async def respond_node(state: AgentState, service: MemoryService) -> dict[str, A
       失败自动回退模板——模型挂了用户照样拿到结果。
     """
     with span("node.respond", logger, trace_id=state.get("trace_id", "-")):
-        # 记忆查询：直接精确列出，不交给模型自由发挥——清单必须准确
+        # 记忆查询：清单本身必须准确（不能让模型自由发挥），
+        # 但"我刚刚干了什么"这类问法也会落进这个意图——它问的是对话历史不是记忆。
+        # 所以：清单作为确定事实喂给模型，让它结合"最近对话"作答；
+        # 模型不可用（mock / 挂了）时回退纯模板，测试确定性不受影响。
         if any(i.get("type") == IntentType.MEMORY_QUERY.value
                for i in state.get("intents", [])):
             records = service.long_term.list_by_member(
                 state.get("member_id", "member_001"),
                 viewer_role=state.get("member_role", "L4"),
             )
+            mem_facts = [f"记忆清单第{i}条：{r.memory_value}"
+                         for i, r in enumerate(records, 1)]
+            client = get_llm_client()
+            if client.enabled:
+                generated = await _llm_generate_answer(state, mem_facts)
+                if generated:
+                    return {"final_answer": generated}
             if not records:
                 return {"final_answer":
                         "我还没记住你的任何习惯。可以说「我喜欢…」或「我习惯…」教我。"}

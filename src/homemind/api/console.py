@@ -33,6 +33,7 @@ from ..auth.store import FAMILIES
 from ..core.trace import get_logger, new_trace_id, set_trace_id
 from ..memory.long_term import LongTermMemory
 from ..memory.service import MemoryService
+from ..memory.short_term import get_short_term_memory
 from ..tools.calendar_server import get_schedules
 from ..tools.device_server import _DEVICES, get_device_states
 from ..tools.registry import default_registry
@@ -455,18 +456,35 @@ async def assistant(
 
     动作卡来自真实工具回执——不是模型编的。模型只负责表达层。
     member_id 取自 token：AI 记住的偏好是按人存的，身份必须可信。
+
+    多轮记忆（"滑动窗口 + 摘要压缩"模式）：
+    - 会话按登录者隔离：`console:{member_id}`，换账号互不可见
+    - 每轮先写短期记忆，再把"窗口内原文 + 窗口外摘要"注入 prompt
+    - 跑完把应答也写回，下一轮"我刚刚干了什么"才答得上来
     """
     trace_id = new_trace_id()
     set_trace_id(trace_id)
 
+    session_id = f"console:{user.member_id}"   # 请求体里的 session_id 不可信，忽略
+    memory = get_short_term_memory()
+    await memory.append(session_id, "user", req.text)
+    context = await memory.get_context(session_id)
+
     state = initial_state(
         user_input=req.text,
         member_id=user.member_id,
+        member_role=user.role,
         confirmed=req.confirmed,
         trace_id=trace_id,
+        chat_history=context["messages"],
+        chat_summary=context["summary"] or "",
     )
     graph = build_agent_graph()
     result = await graph.ainvoke(state)
+
+    answer = result.get("final_answer", "")
+    if answer:
+        await memory.append(session_id, "assistant", answer)
 
     actions = []
     for res in result.get("tool_results", []):
