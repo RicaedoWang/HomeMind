@@ -29,6 +29,9 @@ class AgentState(TypedDict, total=False):
         confirm_prompt 需要回显给用户的确认文案
         final_answer   最终应答
         degraded       是否发生了降级（供监控统计）
+        agent_assignments 多 Agent 分派结果（V0.8，FR-MUL-001）
+        agent_results     各子 Agent 的执行结果与 trace（V0.8，FR-MUL-003）
+        conflicts         执行前检测到的操作冲突（V0.8，FR-MUL-004）
     """
 
     trace_id: str
@@ -46,6 +49,9 @@ class AgentState(TypedDict, total=False):
     confirm_prompt: str
     final_answer: str
     degraded: bool
+    agent_assignments: list[dict[str, Any]]
+    agent_results: list[dict[str, Any]]
+    conflicts: list[dict[str, Any]]
 
 
 def initial_state(
@@ -72,4 +78,7 @@ def initial_state(
         "confirm_prompt": "",
         "final_answer": "",
         "degraded": False,
+        "agent_assignments": [],
+        "agent_results": [],
+        "conflicts": [],
     }
