@@ -12,7 +12,6 @@
 
 from __future__ import annotations
 
-import re
 import uuid
 from typing import Any
 
@@ -22,7 +21,9 @@ from ..core.llm import get_llm_client
 from ..core.models import IntentType, TaskStatus
 from ..core.trace import get_logger, span
 from ..memory.service import MemoryService, get_memory_service
-from ..tools.registry import ToolRegistry, make_idempotency_key
+from ..tools.registry import ToolRegistry
+from .execution import apply_memory_to_arguments as _apply_memory_to_arguments
+from .execution import execute_task
 from .intent import IntentParser
 from .state import AgentState
 
@@ -51,44 +52,9 @@ async def recall_memory_node(state: AgentState, service: MemoryService) -> dict[
         return {"recalled_memories": recalled}
 
 
-# ---------------- 记忆如何影响行为（Agent × Memory 融合的核心）----------------
-
-def _apply_memory_to_arguments(
-    arguments: dict[str, Any],
-    recalled: list[dict[str, Any]],
-) -> tuple[dict[str, Any], dict[str, Any] | None]:
-    """用召回到的记忆补全工具参数。
-
-    典型场景：用户说"把空调打开"，但记忆里存着"喜欢 26 度"
-    → 自动补成"调到 26 度"，而不是傻乎乎地只开机。
-
-    这就是"记忆系统"从花架子变成真能力的一跃：
-    记忆不只是能被查出来，而是能改变 Agent 的行为。
-    """
-    if arguments.get("device_name") != "空调":
-        return arguments, None
-    if arguments.get("action") != "turn_on":
-        return arguments, None
-    if arguments.get("value") is not None:
-        return arguments, None  # 用户明说了温度，不覆盖
-
-    for mem in recalled:
-        text = mem.get("memory_value", "")
-        match = re.search(r"(\d+(?:\.\d+)?)\s*度", text)
-        if match and ("空调" in text or "温度" in text):
-            patched = dict(arguments)
-            patched["action"] = "set_value"
-            patched["value"] = float(match.group(1))
-            return patched, {
-                "memory_key": mem.get("memory_key"),
-                "memory_value": text,
-                "score": mem.get("score"),
-                "applied_as": f"set_value {match.group(1)}度",
-            }
-    return arguments, None
-
-
 # ---------------- 节点 5：记忆写入 ----------------
+
+# 注：记忆补参与增量调节的实现已抽到 execution.py，与子 Agent 共用同一份治理逻辑。
 
 async def write_memory_node(state: AgentState, service: MemoryService) -> dict[str, Any]:
     """应答生成后，把本轮对话里的记忆点写入记忆库（FR-MEM-004）。"""
@@ -216,6 +182,11 @@ async def safety_gate_node(state: AgentState) -> dict[str, Any]:
                 pending.append(f"我不太确定你的意思是「{task.get('intent', {}).get('raw_text')}」，"
                                f"能再说清楚一点吗？")
 
+        # 多 Agent 冲突：同一设备被要求做相反动作（V0.8）
+        # 单看都合法，合起来自相矛盾，必须先跟用户对清楚
+        for conflict in state.get("conflicts", []):
+            pending.append(f"【冲突】{conflict.get('detail')}")
+
         # 意图整体置信度过低：直接澄清
         if not pending and state.get("intents"):
             lowest = min(i.get("confidence", 1.0) for i in state["intents"])
@@ -228,27 +199,6 @@ async def safety_gate_node(state: AgentState) -> dict[str, Any]:
 
 
 # ---------------- 节点：工具执行 ----------------
-
-async def _resolve_delta(registry: ToolRegistry, arguments: dict[str, Any]) -> dict[str, Any]:
-    """增量调节解析：先查当前值，再算出目标值。
-
-    例："空调调低两度" → 查到当前 26 度 → 目标 24 度。
-    这两步必须串行，所以放在执行层而不是规划层。
-    """
-    device_name = arguments.get("device_name")
-    room = arguments.get("room")
-    delta = float(arguments.get("delta", 1.0))
-
-    query = await registry.call("device_control",
-                                {"action": "query", "device_name": device_name, "room": room})
-    current = 26.0
-    if query.ok and query.data.get("device"):
-        current = query.data["device"].get("value") or 26.0
-
-    direction = -1 if arguments.get("action") == "delta_down" else 1
-    new_value = round(float(current) + direction * delta, 1)
-    return {"action": "set_value", "device_name": device_name, "room": room, "value": new_value}
-
 
 async def execute_tools_node(state: AgentState, registry: ToolRegistry) -> dict[str, Any]:
     """节点 3：执行工具调用，带治理与降级。"""
@@ -270,33 +220,16 @@ async def execute_tools_node(state: AgentState, registry: ToolRegistry) -> dict[
             if task.get("requires_confirm") and not state.get("confirmed"):
                 continue
 
-            arguments = dict(task.get("arguments", {}))
-            if arguments.get("action") in ("delta_up", "delta_down"):
-                arguments = await _resolve_delta(registry, arguments)
-            else:
-                # 用户没给足参数时，用召回的记忆补全（如"开空调"→ 记忆里的 26 度）
-                arguments, applied_mem = _apply_memory_to_arguments(
-                    arguments, state.get("recalled_memories", [])
-                )
-                if applied_mem:
-                    applied.append(applied_mem)
-                    logger.info("memory applied to tool args: %s", applied_mem["applied_as"],
-                                extra={"extra_fields": {"event": "memory.apply",
-                                                        "key": applied_mem["memory_key"]}})
-
-            # 幂等键：写操作防重复
-            idem_key = None
-            spec = registry.get(tool_name)
-            if spec and spec.mutating:
-                # 带上原始输入，避免不同指令凑巧同参数被误判为重复请求
-                idem_key = make_idempotency_key(
-                    tool_name, arguments, context=state.get("user_input", "")
-                )
-
-            result = await registry.call(tool_name, arguments, idempotency_key=idem_key)
-            if not result.ok or result.degraded:
+            # 执行原语（含增量解析、记忆补全、幂等键）与子 Agent 共用同一份实现
+            result_dict, applied_mem, task_degraded = await execute_task(registry, task, state)
+            if applied_mem:
+                applied.append(applied_mem)
+                logger.info("memory applied to tool args: %s", applied_mem["applied_as"],
+                            extra={"extra_fields": {"event": "memory.apply",
+                                                    "key": applied_mem["memory_key"]}})
+            if task_degraded:
                 degraded = True
-            results.append(result.to_dict())
+            results.append(result_dict)
 
     return {"tool_results": results, "degraded": degraded, "applied_memories": applied}
 
