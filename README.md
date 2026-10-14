@@ -73,6 +73,7 @@ python scripts/demo_agent_memory.py  # V0.5 记忆接入 Agent（记忆改变行
 python scripts/demo_multi_agent.py   # V0.8 多 Agent 协同（六段）
 python scripts/chat_cli.py           # 交互式命令行：问答式定制家居习惯
 python scripts/run_eval.py           # 端到端评测（49 条用例 + 红线否决）
+python scripts/verify_all.py         # 一键自检：把上面这些全跑一遍并汇总
 python scripts/web_ui.py             # Gradio Web 界面（可视化链路 + 一键评测）
 pytest -q
 ```
