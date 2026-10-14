@@ -1,0 +1,143 @@
+/* ============================================================
+   HomeMind Design Tokens
+   严格对齐《界面设计文档 v1.1》第 3 章
+   - 深色为默认主题（控制台夜间使用占比高）
+   - 主题切换通过 html[data-theme] 覆盖变量实现
+   ============================================================ */
+
+:root {
+  /* ---- 品牌色（不随主题变化）---- */
+  --hm-color-brand: #4f7bff;
+  --hm-color-brand-soft: rgba(79, 123, 255, 0.12);
+  --hm-color-accent: #22d3a8;
+
+  /* ---- 布局 ---- */
+  --hm-content-max: 1440px;
+  --hm-gutter: 16px;
+  --hm-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --hm-tabbar-h: 56px;
+
+  /* ---- 间距（8pt 基准）---- */
+  --hm-space-1: 4px;
+  --hm-space-2: 8px;
+  --hm-space-3: 12px;
+  --hm-space-4: 16px;
+  --hm-space-5: 20px;
+  --hm-space-6: 24px;
+  --hm-space-8: 32px;
+  --hm-space-10: 40px;
+  --hm-space-12: 48px;
+
+  /* ---- 圆角 ---- */
+  --hm-radius-xs: 8px;
+  --hm-radius-sm: 12px;
+  --hm-radius-md: 16px;
+  --hm-radius-lg: 20px;
+  --hm-radius-xl: 28px;
+  --hm-radius-full: 999px;
+
+  /* ---- 字体 ---- */
+  --hm-font-sans: "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei",
+    system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --hm-font-num: "DIN Alternate", "SF Pro Display", "Bahnschrift", var(--hm-font-sans);
+
+  /* ---- 字阶（移动端）---- */
+  --hm-fs-display: 40px;
+  --hm-fs-h1: 28px;
+  --hm-fs-h2: 22px;
+  --hm-fs-h3: 18px;
+  --hm-fs-body: 15px;
+  --hm-fs-sm: 13px;
+  --hm-fs-xs: 11px;
+
+  /* ---- 动效 ---- */
+  --hm-dur-instant: 120ms;
+  --hm-dur-fast: 200ms;
+  --hm-dur-base: 320ms;
+  --hm-dur-slow: 480ms;
+  --hm-dur-bubble: 760ms;
+  --hm-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --hm-ease-emphasis: cubic-bezier(0.22, 1, 0.36, 1);
+  --hm-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ---- 玻璃拟态 ---- */
+  --hm-blur-glass: saturate(180%) blur(20px);
+
+  /* ---- 灯光情景色 ---- */
+  --hm-light-warm: #ffb871;
+  --hm-light-natural: #fff3e0;
+  --hm-light-cool: #eaf3ff;
+  --hm-light-night: #ff7a45;
+}
+
+@media (min-width: 768px) {
+  :root { --hm-gutter: 24px; --hm-fs-display: 44px; --hm-fs-h1: 30px; }
+}
+@media (min-width: 1024px) {
+  :root { --hm-gutter: 32px; }
+}
+
+/* ============================ 深色主题（默认） ============================ */
+html[data-theme="dark"] {
+  --hm-bg-base: #0b0f14;
+  --hm-bg-surface: #141a22;
+  --hm-bg-elevated: #1c2430;
+  --hm-bg-sunken: #080b0f;
+  --hm-bg-glass: rgba(20, 26, 34, 0.72);
+  --hm-border-subtle: #222c38;
+  --hm-border-strong: #2e3a48;
+  --hm-text-primary: #f2f6fb;
+  --hm-text-secondary: #a8b6c8;
+  --hm-text-tertiary: #6e7e92;
+  --hm-text-inverse: #0b0f14;
+  --hm-shadow-card: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --hm-shadow-float: 0 16px 48px rgba(0, 0, 0, 0.55);
+  --hm-color-success: #34d399;
+  --hm-color-warning: #fbbf24;
+  --hm-color-danger: #f87171;
+  --hm-color-info: #60a5fa;
+  --hm-mask: rgba(8, 11, 15, 0.56);
+}
+
+/* ============================ 浅色主题 ============================ */
+html[data-theme="light"] {
+  --hm-bg-base: #f5f7fa;
+  --hm-bg-surface: #ffffff;
+  --hm-bg-elevated: #ffffff;
+  --hm-bg-sunken: #edf1f6;
+  --hm-bg-glass: rgba(255, 255, 255, 0.76);
+  --hm-border-subtle: #e6ebf2;
+  --hm-border-strong: #d3dbe6;
+  --hm-text-primary: #10161e;
+  --hm-text-secondary: #5a6a7e;
+  --hm-text-tertiary: #93a1b2;
+  --hm-text-inverse: #ffffff;
+  --hm-shadow-card: 0 4px 16px rgba(16, 22, 30, 0.08);
+  --hm-shadow-float: 0 12px 36px rgba(16, 22, 30, 0.14);
+  --hm-color-success: #10b981;
+  --hm-color-warning: #f59e0b;
+  --hm-color-danger: #ef4444;
+  --hm-color-info: #3b82f6;
+  --hm-mask: rgba(16, 22, 30, 0.42);
+}
+
+/* ============================ 无障碍 ============================ */
+/* 焦点环：桌面端键盘可达，绝不 outline: none */
+:focus-visible {
+  outline: 2px solid var(--hm-color-brand);
+  outline-offset: 2px;
+  border-radius: var(--hm-radius-xs);
+}
+
+/* 全局动效降级：用户要求减少动效时，动画近乎瞬时，
+   气泡粒子则在 JS 中直接跳过（matchMedia 检测） */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

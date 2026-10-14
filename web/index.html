@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<meta name="theme-color" content="#0B0F14" />
+<meta name="description" content="HomeMind 智能家居控制台：任务优先的家庭协同中枢" />
+<title>HomeMind · 智能家居控制台</title>
+<link rel="stylesheet" href="/assets/tokens.css" />
+<link rel="stylesheet" href="/assets/app.css" />
+</head>
+<body>
+
+<!-- ============================ 图标精灵 ============================ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <g id="s-base" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></g>
+  </defs>
+  <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.2 12 4l9 7.2V19a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-task" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4.5" width="16" height="15" rx="3"/><path d="m8.5 12 2.5 2.5 4.5-5"/></symbol>
+  <symbol id="i-scene" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 13.7 8l4.5 1.7L13.7 11.4 12 16l-1.7-4.6L5.8 9.7 10.3 8z"/><path d="M18.2 15.4l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.2" r="3.4"/><path d="M4.5 20c0-3.4 3.4-5.8 7.5-5.8s7.5 2.4 7.5 5.8"/></symbol>
+  <symbol id="i-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0-3.6 10.8c.5.4.8 1 .8 1.6V16h5.6v-.6c0-.6.3-1.2.8-1.6A6 6 0 0 0 12 3z"/><path d="M9.5 19h5M10.5 21.5h3"/></symbol>
+  <symbol id="i-ac" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10.5A3 3 0 1 0 10.5 5"/><path d="M3 12h18"/><path d="M3 16h12.5a3 3 0 1 1-3 3"/></symbol>
+  <symbol id="i-curtain" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5h18"/><path d="M4.5 4.5v15M19.5 4.5v15"/><path d="M3 10h18M3 15h18"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 10.5V8a5.5 5.5 0 0 1 11 0v2.5"/><rect x="4.5" y="10.5" width="15" height="9.5" rx="2.5"/><path d="M12 14v2.5"/></symbol>
+  <symbol id="i-washer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="3"/><circle cx="12" cy="14" r="4"/><path d="M8 7h3M15.5 7h.01"/></symbol>
+  <symbol id="i-robot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13a9 9 0 0 1 18 0v3.5a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/><path d="M9.5 10.5h.01M14.5 10.5h.01"/></symbol>
+  <symbol id="i-humidifier" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2 6.8 10a6.2 6.2 0 1 0 10.4 0z"/></symbol>
+  <symbol id="i-valve" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9.5"/><path d="M12 9.5C9 9.5 7 7.5 7 4.5c3 0 5 2 5 5zM12 11.5c3 0 5-2 5-5-3 0-5 2-5 5z"/></symbol>
+  <symbol id="i-plant" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19c0-7 5-12 14-12 0 9-5 13-11 13z"/><path d="M5.5 19c2.5-3.5 5.5-5.5 8.5-6.5"/></symbol>
+  <symbol id="i-laundry" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 4.5 6.2l2 3L5 20h14l-1.5-10.8 2-3L15 4l-3 2z"/></symbol>
+  <symbol id="i-pet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="7" cy="11.5" rx="2" ry="2.4"/><ellipse cx="12" cy="8.5" rx="2" ry="2.6"/><ellipse cx="17" cy="11.5" rx="2" ry="2.4"/><path d="M12 12.5c2.6 0 4.2 1.8 4.2 4.1S14.6 20 12 20s-4.2-.9-4.2-3.4 1.6-4.1 4.2-4.1z"/></symbol>
+  <symbol id="i-security" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 5 6.2V12c0 4.2 3 7 7 8.5 4-1.5 7-4.3 7-8.5V6.2z"/><path d="m9.5 11.8 2 2 3.2-3.6"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></symbol>
+  <symbol id="i-movie" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M8 5v14M16 5v14"/></symbol>
+  <symbol id="i-exit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4.5H18a1.5 1.5 0 0 1 1.5 1.5v12A1.5 1.5 0 0 1 18 19.5h-3.5"/><path d="M10 8.5 6 12l4 3.5M6 12h9.5"/></symbol>
+  <symbol id="i-thermo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.2V5.5a2 2 0 1 0-4 0v8.7a4 4 0 1 0 4 0z"/></symbol>
+  <symbol id="i-drop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2 6.8 10a6.2 6.2 0 1 0 10.4 0z"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 3 5.5 13.5H11l-1 7.5 8.5-11H13z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5a5.5 5.5 0 0 1 11 0c0 4 1.5 5.5 1.5 5.5H5s1.5-1.5 1.5-5.5z"/><path d="M10 18.2a2.2 2.2 0 0 0 4 0"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.6 4.6L19 7"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6.5 9.5 5.5 5.5 5.5-5.5"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9.5 6 6 6-6 6"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.5V5"/><path d="m6 11 6-6 6 6"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v5h-5"/></symbol>
+  <symbol id="i-sparkle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l1.5 4.2L17.5 10l-4 1.8L12 16l-1.5-4.2L6.5 10l4-1.8z"/><path d="M18 16.5l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/></symbol>
+</svg>
+
+<!-- ============================ 应用骨架 ============================ -->
+<div class="hm-app">
+
+  <!-- 桌面端侧栏 -->
+  <nav class="hm-sidenav" aria-label="主导航">
+    <div class="hm-sidenav__brand">
+      <svg class="hm-ico" style="color:var(--hm-color-brand)"><use href="#i-sparkle"/></svg>
+      HomeMind
+    </div>
+    <button class="hm-sidenav__item is-active" data-page="home">
+      <svg class="hm-ico"><use href="#i-home"/></svg> 首页
+    </button>
+    <button class="hm-sidenav__item" data-page="tasks">
+      <svg class="hm-ico"><use href="#i-task"/></svg> 任务
+    </button>
+    <button class="hm-sidenav__item" data-page="scenes">
+      <svg class="hm-ico"><use href="#i-scene"/></svg> 场景
+    </button>
+    <button class="hm-sidenav__item" data-page="me">
+      <svg class="hm-ico"><use href="#i-user"/></svg> 我的
+    </button>
+    <div style="margin-top:auto;font-size:11px;color:var(--hm-text-tertiary)">
+      LangGraph 多智能体 · v0.8
+    </div>
+  </nav>
+
+  <!-- 中间主列 -->
+  <div>
+    <!-- 环境栏 -->
+    <header class="hm-envbar" id="envbar">
+      <div class="hm-envbar__row1">
+        <div class="hm-envbar__date">
+          <strong id="env-date">—</strong>
+          <span class="hm-envbar__lunar" id="env-lunar"></span>
+        </div>
+        <button class="hm-chip-ask" id="btn-ask">
+          <svg class="hm-ico hm-ico--sm"><use href="#i-sparkle"/></svg> 问一句
+        </button>
+      </div>
+      <div class="hm-envbar__row2" id="env-row2">
+        <span class="hm-envbar__temp num" id="env-temp">--<sup>°C</sup></span>
+        <span class="hm-envbar__metric" id="env-metrics"></span>
+      </div>
+      <form class="hm-envbar__ask" id="env-ask" autocomplete="off">
+        <input id="env-ask-input" placeholder="问我任何事，比如「客厅有点暗」" aria-label="问一句" />
+        <button type="submit" class="hm-sheet__send" aria-label="发送">
+          <svg class="hm-ico"><use href="#i-send"/></svg>
+        </button>
+      </form>
+    </header>
+
+    <main class="hm-main">
+      <!-- ---------------- 首页 ---------------- -->
+      <section class="hm-page is-active" id="page-home">
+        <!-- 舒适度提示 -->
+        <div class="hm-hint" id="hint" hidden>
+          <svg class="hm-ico" id="hint-icon"><use href="#i-thermo"/></svg>
+          <span class="hm-hint__text" id="hint-text"></span>
+          <button class="hm-hint__action" id="hint-action"></button>
+        </div>
+
+        <!-- 任务中心 -->
+        <section class="hm-taskhub" id="taskhub" aria-label="今日任务">
+          <div class="hm-taskhub__head">
+            <svg class="hm-taskhub__handle hm-ico hm-ico--lg" id="taskhub-handle" role="button"
+                 tabindex="0" aria-label="折叠任务中心"><use href="#i-chevron-down"/></svg>
+            <span class="hm-taskhub__title" id="taskhub-title">今日任务</span>
+            <span class="hm-taskhub__count" id="taskhub-count"></span>
+            <span class="hm-taskhub__summary" id="taskhub-summary"></span>
+          </div>
+          <div class="hm-taskhub__body">
+            <div class="hm-taskhub__inner">
+              <div class="hm-taskhub__scroller" id="taskhub-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 场景 -->
+        <section class="hm-section" aria-label="快捷场景">
+          <div class="hm-section__head">
+            <span class="hm-section__title">快捷场景</span>
+            <span class="hm-section__more">一键联动多个设备</span>
+          </div>
+          <div class="hm-scenes" id="scenes"></div>
+        </section>
+
+        <!-- 设备 -->
+        <div id="device-sections"></div>
+
+        <!-- 摘要条 -->
+        <div class="hm-summary" id="summary"></div>
+      </section>
+
+      <!-- ---------------- 任务页 ---------------- -->
+      <section class="hm-page" id="page-tasks">
+        <div class="hm-page__head hm-page__head--mobile">
+          <span class="hm-page__title">任务</span>
+          <span class="hm-page__sub" id="tasks-sub"></span>
+        </div>
+        <div class="hm-list" id="page-tasks-list"></div>
+      </section>
+
+      <!-- ---------------- 场景页 ---------------- -->
+      <section class="hm-page" id="page-scenes">
+        <div class="hm-page__head hm-page__head--mobile">
+          <span class="hm-page__title">场景</span>
+          <span class="hm-page__sub">点击即执行</span>
+        </div>
+        <div class="hm-list" id="page-scenes-list"></div>
+      </section>
+
+      <!-- ---------------- 我的 ---------------- -->
+      <section class="hm-page" id="page-me">
+        <div class="hm-page__head hm-page__head--mobile">
+          <span class="hm-page__title">我的</span>
+          <span class="hm-page__sub">家庭与偏好</span>
+        </div>
+        <div id="page-me-body"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- 桌面端右栏 -->
+  <aside class="hm-aside" aria-label="概览">
+    <div class="hm-aside__title">今日概览</div>
+    <div id="aside-energy"></div>
+    <div class="hm-aside__title" style="margin-top:24px">家庭消息</div>
+    <div id="aside-messages"></div>
+    <div class="hm-aside__title" style="margin-top:24px">家庭成员</div>
+    <div id="aside-family"></div>
+    <div class="hm-aside__title" style="margin-top:24px">AI 记住的习惯</div>
+    <div id="aside-habits"></div>
+  </aside>
+</div>
+
+<!-- ============================ 底部 TabBar ============================ -->
+<nav class="hm-tabbar" aria-label="底部导航">
+  <button class="hm-tabbar__item is-active" data-page="home">
+    <svg class="hm-ico"><use href="#i-home"/></svg> 首页
+  </button>
+  <button class="hm-tabbar__item" data-page="tasks">
+    <svg class="hm-ico"><use href="#i-task"/></svg> 任务
+  </button>
+  <button class="hm-tabbar__item" data-page="scenes">
+    <svg class="hm-ico"><use href="#i-scene"/></svg> 场景
+  </button>
+  <button class="hm-tabbar__item" data-page="me">
+    <svg class="hm-ico"><use href="#i-user"/></svg> 我的
+  </button>
+</nav>
+
+<!-- ============================ AI 悬浮球 ============================ -->
+<button class="hm-fab" id="fab" aria-label="打开 AI 助手">
+  <svg class="hm-ico hm-ico--lg" style="color:#fff"><use href="#i-sparkle"/></svg>
+</button>
+
+<!-- ============================ 撤销 Toast ============================ -->
+<div class="hm-toast" id="toast" role="status" aria-live="polite">
+  <span class="hm-toast__text" id="toast-text"></span>
+  <button class="hm-toast__undo" id="toast-undo">撤销</button>
+  <span class="hm-toast__progress" id="toast-progress"></span>
+</div>
+
+<!-- ============================ 确认弹层 ============================ -->
+<div class="hm-modal-mask" id="modal-mask">
+  <div class="hm-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="hm-modal__title" id="modal-title"></div>
+    <div class="hm-modal__desc" id="modal-desc"></div>
+    <div class="hm-chips" id="modal-chips"></div>
+    <div class="hm-modal__actions">
+      <button class="hm-btn hm-btn--ghost" id="modal-cancel">再想想</button>
+      <button class="hm-btn hm-btn--primary" id="modal-ok">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ AI 对话面板 ============================ -->
+<div class="hm-sheet-mask" id="sheet-mask"></div>
+<section class="hm-sheet" id="sheet" aria-label="AI 助手" role="dialog" aria-modal="true">
+  <div class="hm-sheet__head">
+    <div class="hm-sheet__title">
+      AI 管家
+      <small id="sheet-sub">意图识别 · 多智能体 · 安全护栏</small>
+    </div>
+    <button id="sheet-close" aria-label="关闭" style="width:44px;height:44px;display:grid;place-items:center;color:var(--hm-text-tertiary)">
+      <svg class="hm-ico"><use href="#i-close"/></svg>
+    </button>
+  </div>
+  <div class="hm-sheet__body" id="sheet-body"></div>
+  <div class="hm-suggestions" id="sheet-suggestions"></div>
+  <form class="hm-sheet__input" id="sheet-form" autocomplete="off">
+    <input id="sheet-input" placeholder="说点什么，比如「我习惯空调开 24 度」" aria-label="输入消息" />
+    <button type="submit" class="hm-sheet__send" id="sheet-send" aria-label="发送">
+      <svg class="hm-ico"><use href="#i-send"/></svg>
+    </button>
+  </form>
+</section>
+
+<script src="/assets/app.js"></script>
+</body>
+</html>
