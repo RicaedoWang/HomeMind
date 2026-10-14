@@ -25,6 +25,14 @@ _DEVICES: dict[str, DeviceState] = {
     "living_room_curtain": DeviceState("living_room_curtain", "客厅窗帘", "客厅", "curtain"),
     "bedroom_light": DeviceState("bedroom_light", "主卧灯", "主卧", "light"),
     "front_door_lock": DeviceState("front_door_lock", "大门门锁", "玄关", "lock"),
+    # 以下为控制台界面补齐的设备（洗衣机/晾衣机/扫地机/加湿器/浇花器），
+    # 命名刻意避开"灯""空调""窗帘""门锁"等已有子串，不影响既有模糊匹配。
+    "balcony_washer": DeviceState("balcony_washer", "洗衣机", "阳台", "washer"),
+    "balcony_dryer": DeviceState("balcony_dryer", "智能晾衣机", "阳台", "dryer"),
+    "living_room_robot": DeviceState("living_room_robot", "扫地机器人", "客厅", "robot"),
+    "bedroom_humidifier": DeviceState("bedroom_humidifier", "加湿器", "主卧", "humidifier",
+                                      value=50.0),
+    "balcony_valve": DeviceState("balcony_valve", "智能浇花器", "阳台", "valve"),
 }
 
 # 高危设备：动作执行前强制确认

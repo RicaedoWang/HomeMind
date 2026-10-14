@@ -24,6 +24,7 @@ from ..memory.short_term import get_short_term_memory
 from ..tools.calendar_server import get_schedules
 from ..tools.device_server import get_device_states
 from ..tools.registry import ToolRegistry, default_registry
+from .console import mount_web, router as console_router
 
 logger = get_logger("api")
 
@@ -74,6 +75,12 @@ app = FastAPI(
     description="意图理解 → 任务规划 → 工具调用 → 应答生成的 Agent 服务",
     lifespan=lifespan,
 )
+
+# 控制台 REST API（Web 界面数据源）
+app.include_router(console_router)
+
+# 托管前端静态站点：一条命令同时起 API 与 Web 控制台
+mount_web(app)
 
 
 @app.get("/health")
