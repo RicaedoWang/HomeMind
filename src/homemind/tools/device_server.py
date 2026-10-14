@@ -30,6 +30,24 @@ _DEVICES: dict[str, DeviceState] = {
 # 高危设备：动作执行前强制确认
 _HIGH_RISK_TYPES = {"lock", "gas_valve"}
 
+# 初始设备快照：评测（以及任何需要可复现结果的场景）靠它把状态打回原点。
+# Mock 状态是模块级全局的——第 1 条用例把灯关了，第 20 条查到的就是"关"，
+# 不重置的话评测结果根本不可复现。
+_INITIAL_DEVICES: dict[str, DeviceState] = {
+    key: DeviceState(device_id=dev.device_id, name=dev.name, room=dev.room,
+                     device_type=dev.device_type, power=dev.power, value=dev.value)
+    for key, dev in _DEVICES.items()
+}
+
+
+def reset_devices() -> None:
+    """把 Mock 设备状态重置为初始值（评测与测试前置调用）。"""
+    for key, snapshot in _INITIAL_DEVICES.items():
+        _DEVICES[key] = DeviceState(
+            device_id=snapshot.device_id, name=snapshot.name, room=snapshot.room,
+            device_type=snapshot.device_type, power=snapshot.power, value=snapshot.value,
+        )
+
 
 def _find_device(device_name: str | None, room: str | None = None) -> DeviceState | None:
     """按名称模糊匹配设备，可带房间限定。

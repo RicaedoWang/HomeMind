@@ -18,8 +18,15 @@ from .registry import ToolSpec
 logger = get_logger("tools.calendar")
 
 # 内存存储：真实环境替换为 MySQL（表结构见 SRS 5.1 Schedule 实体）
+# 注意：这是模块级全局状态，评测跑批时必须先 reset，否则用例之间互相污染。
 _SCHEDULES: list[dict[str, Any]] = []
 _SEQ = {"value": 0}
+
+
+def reset_schedules() -> None:
+    """清空 Mock 日程并重置自增序号（评测与测试前置调用）。"""
+    _SCHEDULES.clear()
+    _SEQ["value"] = 0
 
 
 def _next_id() -> str:

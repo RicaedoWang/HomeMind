@@ -16,3 +16,7 @@ data/
 *.db
 *.sqlite
 *.sqlite3
+
+# 评测产物：报告含应答全文，随代码频繁变动，入库只会制造噪音 diff
+reports/
+.eval-cache/
