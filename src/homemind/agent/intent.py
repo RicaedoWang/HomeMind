@@ -37,7 +37,9 @@ DELTA_DOWN = ("调低", "降低", "降")
 QUERY_WORDS = ("状态", "开着吗", "关了吗", "多少度", "查询", "看看")
 
 SCHEDULE_WORDS = ("提醒", "记得", "日程", "安排", "闹钟", "提示我", "别忘了")
-KNOWLEDGE_WORDS = ("怎么", "如何", "为什么", "什么意思", "说明书", "怎么用")
+KNOWLEDGE_WORDS = ("怎么", "如何", "为什么", "什么意思", "说明书", "怎么用",
+                   "多久", "几次", "清洗", "保养", "故障", "坏了")
+# 注意：不要往这里加"多少"——"空调多少度"是查设备状态，属于设备控制而非知识问答。
 
 # 偏好/习惯表达：这是陈述句不是祈使句，绝不能当成控制指令执行。
 # 例："我习惯空调开24度" 里的"开"不是让你现在开空调，是在描述习惯。
@@ -156,7 +158,9 @@ def _classify(text: str) -> tuple[IntentType, float]:
     has_schedule = any(w in text for w in SCHEDULE_WORDS)
     has_knowledge = any(w in text for w in KNOWLEDGE_WORDS)
 
-    if has_device and has_action:
+    # 疑问词必须压过设备动作：问"空调滤网怎么洗"是在求知识，不是在下指令。
+    # 这个顺序写反了的代价很实在——疑问句被当祈使句，Agent 会真的去动设备。
+    if has_device and has_action and not has_knowledge:
         return IntentType.DEVICE_CONTROL, 0.9
     if has_schedule:
         return IntentType.SCHEDULE, 0.85
