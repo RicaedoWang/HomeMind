@@ -94,6 +94,28 @@ def code_stats() -> tuple[int, int]:
     return len(files), lines
 
 
+def _find_node() -> tuple[str | None, str | None]:
+    """找 node 与装了 jsdom 的 node_modules。
+
+    jsdom 装在托管的 node 工作区里（不污染本机），
+    所以要把 node_modules 路径通过 NODE_PATH 带过去。
+    """
+    import os
+    import shutil
+
+    node = shutil.which("node") or shutil.which("node.exe")
+    if not node:
+        return None, None
+    candidates = [
+        os.path.expanduser("~/.workbuddy/binaries/node/workspace/node_modules"),
+        str(ROOT / "node_modules"),
+    ]
+    for path in candidates:
+        if (Path(path) / "jsdom").exists():
+            return node, path
+    return node, None
+
+
 def git_summary() -> str:
     proc = subprocess.run(["git", "rev-list", "--count", "HEAD"], cwd=str(ROOT),
                           capture_output=True, text=True)
@@ -143,6 +165,28 @@ def main() -> int:
     ok = web.returncode == 0 and "UI 构建 OK" in (web.stdout or "")
     print(f"\r  {'✅' if ok else '❌'} {'Web 界面':<16} "
           f"{'构建通过（未启服务器）' if ok else '构建失败'}")
+
+    # 前端交互冒烟（jsdom）：验"渲染出来了"且"点了真有动作"。
+    # 需要 node + jsdom，缺哪个就明确跳过——不把环境缺失伪装成通过。
+    print("  正在跑：前端交互冒烟 …", end="", flush=True)
+    node, node_modules = _find_node()
+    if node and node_modules:
+        import os
+
+        env = _env(True)
+        env["NODE_PATH"] = node_modules
+        web = subprocess.run([node, "scripts/smoke_web.js"], cwd=str(ROOT),
+                             capture_output=True, text=True, encoding="utf-8",
+                             errors="replace", env=env)
+        out = (web.stdout or "")
+        ok = web.returncode == 0 and "全部可点元素均有真实动作" in out
+        hit = re.search(r"点击动作 (\d+) 项", out)
+        detail = f"{hit.group(1)} 项交互全部有真实动作" if (ok and hit) \
+            else (out.strip().splitlines()[-1] if out.strip() else "失败")
+    else:
+        ok, detail = True, "跳过（没找到 node 或 jsdom）"
+    print(f"\r  {'✅' if ok else '❌'} {'前端交互冒烟':<16} {detail}")
+    rows.append(("前端交互冒烟", ok, detail))
 
     files, lines = code_stats()
     print("\n" + "-" * 72)
