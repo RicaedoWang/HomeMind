@@ -264,8 +264,10 @@ python scripts/verify_interactions.py          # 端到端 14 项
    每个都能讲成"我是怎么发现、怎么定位、怎么锁住不复发的"。
 2. **待你拍板**：AI 创建**真正的家务任务**（可指派成员、可联动设备）。
    目前 AI 只能建"提醒"（日程类）。这是今天唯一明确没做完的需求半句。
-3. **待你拍板**：推送到远程。**当前仓库没有任何 remote**（`git remote -v` 为空），
-   且 `gh auth status` 显示 GitHub token 已失效，需要你先 `gh auth login` 或给我一个远程地址。
+3. **待办（2026-10-15 已决定暂缓）**：推送到远程。**当前仓库没有任何 remote**
+   （`git remote -v` 为空），且 `gh auth status` 显示 GitHub token 已失效。
+   用户当日选择"先不上传"——**已知风险：52 个提交只在本机**，硬盘出问题就没了。
+   要动的时候二选一：① 自己跑 `gh auth login` 后我建仓并 push ② 给我远程地址我 remote add + push。
 4. N2 真跑 Redis / Milvus → N3 Checkpoint → N4 能耗真实统计 → N5 CI → N6 Docker。
 
 ### 还没做、但别吹成做了
