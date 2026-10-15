@@ -482,7 +482,15 @@ async def control_device(
     registry = default_registry()
     tool_name = "lock_control" if device.device_type == "lock" else "device_control"
     arguments: dict[str, Any] = {
-        "action": "unlock" if req.action == "turn_on" else "lock"
+        # 括号是**必须的**。原来写成
+        #   "unlock" if action == "turn_on" else "lock" if is_lock else action
+        # Python 的条件表达式右结合，实际解析成
+        #   "unlock" if action == "turn_on" else ("lock" if is_lock else action)
+        # ——于是**任何设备**的 turn_on 都被翻译成 "unlock"：
+        # 灯/空调/窗帘永远打不开（工具回"不支持的动作：unlock"），
+        # 只有 turn_off 原样透传所以"能关不能开"。
+        # 这就是用户报的那个 bug。外层括号把"是不是门锁"变成先判的条件。
+        "action": ("unlock" if req.action == "turn_on" else "lock")
         if device.device_type == "lock" else req.action,
         "device_name": device.name,
         "room": device.room,
@@ -494,8 +502,15 @@ async def control_device(
 
     result = await registry.call(tool_name, arguments)
 
+    # 调用成功 ≠ 操作真的生效：device_control 遇到不支持的动作会返回
+    # success=False 但调用本身没抛错，result.ok 仍是 True。
+    # 以前只判 result.ok，于是"不支持的动作"也被当成功，
+    # 消息中心还记了一条"打开了客厅灯"——灯根本没动。
+    # 消息中心不许放假消息，所以必须看工具自己报的 success。
+    succeeded = result.ok and (result.data or {}).get("success", True)
+
     # 真实事件：只有真的动了才记，失败/被拦的不记（消息中心不放假消息）
-    if result.ok:
+    if succeeded:
         verb = "打开" if req.action == "turn_on" else "关闭"
         kind = TYPE_SECURITY if device.device_type == "lock" else TYPE_DEVICE
         record_event(
@@ -508,7 +523,9 @@ async def control_device(
 
     # 注意顺序：必须在工具调用之后再取设备状态，否则前端拿到的是执行前的旧值，
     # 会显示"后端说开了、卡片还关着"。
-    return {"ok": result.ok, "tool": tool_name,
+    # ok 回的是"操作是否真的生效"，不是"工具有没有被调用"——
+    # 前端据此决定刷新还是报错，回 True 会让它以为成功了。
+    return {"ok": succeeded, "tool": tool_name,
             "message": (result.data or {}).get("message", ""),
             "device": next((d for d in _device_payload(family_id)
                             if d["id"] == device_id), None),

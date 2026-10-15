@@ -27,10 +27,14 @@ logger = get_logger("tools.device")
 _DEVICES: dict[str, dict[str, DeviceState]] = {
     # 深圳的家：亚热带，靠空调和加湿器
     "family_sz": {
-        "living_room_light": DeviceState("living_room_light", "客厅灯", "客厅", "light"),
+        # 可调档设备（灯 / 窗帘）必须给初值：以前没设 value，turn_on 之后
+        # 卡面显示"已开 0%"——灯开着但亮度为零，等于没开，看着像坏了。
+        "living_room_light": DeviceState("living_room_light", "客厅灯", "客厅", "light",
+                                         value=80.0),
         "living_room_ac": DeviceState("living_room_ac", "客厅空调", "客厅", "ac", value=26.0),
-        "living_room_curtain": DeviceState("living_room_curtain", "客厅窗帘", "客厅", "curtain"),
-        "bedroom_light": DeviceState("bedroom_light", "主卧灯", "主卧", "light"),
+        "living_room_curtain": DeviceState("living_room_curtain", "客厅窗帘", "客厅", "curtain",
+                                           value=100.0),
+        "bedroom_light": DeviceState("bedroom_light", "主卧灯", "主卧", "light", value=60.0),
         "front_door_lock": DeviceState("front_door_lock", "大门门锁", "玄关", "lock"),
         # 以下为控制台界面补齐的设备（洗衣机/晾衣机/扫地机/加湿器/浇花器），
         # 命名刻意避开"灯""空调""窗帘""门锁"等已有子串，不影响既有模糊匹配。
@@ -44,7 +48,8 @@ _DEVICES: dict[str, dict[str, DeviceState]] = {
     # 青岛的家：海边湿冷，靠地暖和新风——设备清单刻意与深圳不同，
     # 这样"两个家庭数据不同"一眼就能看出来，不是同一个列表换个名字。
     "family_qd": {
-        "living_room_light": DeviceState("living_room_light", "客厅灯", "客厅", "light"),
+        "living_room_light": DeviceState("living_room_light", "客厅灯", "客厅", "light",
+                                         value=80.0),
         "living_room_heater": DeviceState("living_room_heater", "客厅地暖", "客厅", "heater",
                                           value=20.0),
         "living_room_fan": DeviceState("living_room_fan", "新风系统", "客厅", "fan"),

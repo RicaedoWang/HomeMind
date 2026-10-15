@@ -153,3 +153,68 @@ def test_web_assets_served(client: TestClient) -> None:
     assert "HomeMind" in page.text
     assert client.get("/assets/app.js").status_code == 200
     assert client.get("/assets/app.css").status_code == 200
+
+
+def _device(res: dict, device_id: str) -> dict:
+    """控制接口回的是被操作的那**一台**设备，不是列表。"""
+    assert res["device"]["id"] == device_id
+    return res["device"]
+
+
+def test_turn_on_actually_turns_on(client: TestClient) -> None:
+    """回归：turn_on 必须真的把设备打开，不是"调用了工具"就算完。
+
+    曾经的写法（少一对括号）：
+
+        "action": "unlock" if req.action == "turn_on" else "lock"
+        if device.device_type == "lock" else req.action,
+
+    Python 的条件表达式是**右结合**的，实际被解析成
+        "unlock" if action == "turn_on" else ("lock" if is_lock else action)
+    ——于是**任何设备**的打开动作都被翻译成门锁的 "unlock"：
+    工具回"不支持的动作：unlock"，灯/空调/窗帘永远打不开；
+    而 turn_off 原样透传，所以表现成"能关不能开"。
+    这条用例就是用户那句"开关只可以关闭不可以打开"。
+    """
+    off = client.post("/api/console/devices/living_room_light/control",
+                      json={"action": "turn_off"}).json()
+    assert off["ok"] is True
+    assert _device(off, "living_room_light")["power"] is False
+
+    on = client.post("/api/console/devices/living_room_light/control",
+                     json={"action": "turn_on"}).json()
+    assert on["ok"] is True
+    assert "不支持的动作" not in on["message"], f"动作被翻译错了：{on['message']}"
+    assert on["message"] == "已打开客厅灯"
+    dev = _device(on, "living_room_light")
+    assert dev["power"] is True
+    # 不写死具体亮度（初值可能以后调），但"开着却是 0%"一定是坏的。
+    # 注意别写成 "0%" not in statusText——"80%" 里就有 "0%" 这个子串，
+    # 我自己第一版就是这么写错的。
+    assert dev["statusText"].startswith("已开")
+    assert dev["statusText"] != "已开 0%", \
+        f"灯开了却是 0% 亮度，等于没开：{dev['statusText']}"
+
+    # 空调也一样：带值打开必须生效
+    ac = client.post("/api/console/devices/living_room_ac/control",
+                     json={"action": "turn_on", "value": 24}).json()
+    assert ac["ok"] is True and _device(ac, "living_room_ac")["power"] is True
+
+
+def test_failed_action_reports_failure_and_records_no_event(client: TestClient) -> None:
+    """工具报错时必须如实说失败，且消息中心一条都不记。
+
+    第二层坑：以前只判 result.ok（工具"被调用"就算成功），
+    可 device_control 遇到不支持的动作返回的是 success=False。
+    结果 API 回了 ok=True，消息中心还记一条"打开了客厅灯"——
+    灯根本没动。消息中心不许放假消息，所以必须看工具自己报的 success。
+    """
+    from homemind.api.events import events_of, reset_events
+
+    reset_events()
+    # set_value 不带 value → 工具明确报错
+    res = client.post("/api/console/devices/living_room_light/control",
+                      json={"action": "set_value"}).json()
+    assert res["ok"] is False, f"操作没生效却回了成功：{res}"
+    assert "缺少 value" in res["message"]
+    assert events_of("family_sz") == [], "没真执行的动作不该在消息中心留痕"

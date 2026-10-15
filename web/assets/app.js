@@ -732,7 +732,9 @@
         });
         return;
       }
-      if (!res.ok) { showToast(res.error || '设备没响应，稍后再试'); return; }
+      // 失败时优先说后端给的具体原因（"不支持的动作"），
+      // 别拿"设备没响应"糊弄——用户看到含糊提示只会以为是自己点错了
+      if (!res.ok) { showToast(res.message || res.error || '设备没响应，稍后再试'); return; }
       showToast(res.message || '已执行');
       await refresh();
     } catch {
