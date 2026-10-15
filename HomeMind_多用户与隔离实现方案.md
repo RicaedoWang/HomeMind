@@ -307,3 +307,72 @@ S2 是 S3 的前提（没有租户键就没地方挂两个家的数据）。
 ③ 我习惯空调开24度   → 记下了
 ④ 我有哪些习惯?      → 你目前记下的习惯是：喜欢空调开24度
 ```
+
+---
+
+### S2 · 租户隔离 ✅（2026-10-15 上午）
+
+**一句话**：`family_id` 从 token 一路贯穿到设备层、记忆层、短期记忆、任务与场景；按 id 取资源前先做家庭断言，不属于本家庭 → 403 且零副作用。
+
+#### 改了什么（按层）
+
+| 层 | 改动 |
+|---|---|
+| 常量 | 新建 `core/tenancy.py`：`DEFAULT_FAMILY_ID`、`FAMILY_ARG = "__family_id"`。只放常量与纯函数，零依赖，谁 import 都不会循环 |
+| 设备层 | `_DEVICES` 从 `Dict[id, DeviceState]` 改为 `Dict[family_id, Dict[id, DeviceState]]`；深圳 10 台、青岛 6 台（**设备清单刻意不同**） |
+| 工具层 | handler 只认服务端注入的 `__family_id`，**Schema 里不声明**——模型看不见也造不出来；刻意不读不带下划线的同名参数 |
+| 执行层 | `agent/execution.py` 的 `execute_task` 统一 `arguments[FAMILY_ARG] = family_id`（用赋值不是 setdefault，覆盖任何混入的同名键）。治理仍只有这一处 |
+| 记忆层 | `memory_struct` 加 `family_id`，唯一键升级为 `(family_id, member_id, memory_key)`；SQLite 不能原地改约束 → 建 v2 表 → 搬数据 → 删旧表 → 改名（全程单事务） |
+| 召回 | 语义层已按 member_id 过滤，这里再按 family_id 拦一道（**纵深防御**，防 member_id 撞号） |
+| 短期记忆 | 会话键 `console:{family_id}:{member_id}`；登出清理同步改键 |
+| 控制台 | `/state` 只返回本家庭的设备/任务/场景/消息/成员；设备控制跨家庭 → **403**（不返回 404，避免资源枚举线索） |
+| MySQL DDL | `sql/init.sql` 补 `family_id` + `UNIQUE(family_id, member_id, memory_key)`（原来**连 member 级唯一都没有**，换库会让 upsert 变重复行） |
+
+#### 三条硬指标实测（起真服务，两个账号打 HTTP）
+
+```
+深圳设备: 客厅灯/空调/窗帘/主卧灯/门锁/洗衣机/晾衣机/扫地机/加湿器/浇花器    (10 台)
+青岛设备: 客厅灯/地暖/新风/油烟机/阳台晾衣机/入户门锁                        (6 台)
+
+① 小明看不到深圳空调:            True
+② 深圳看不到青岛地暖:            True
+③ 小明控制深圳空调 → 403 无权操作该设备；深圳空调状态未被改动: True
+④ 小明完成深圳浇花任务 → 404
+⑤ 深圳场景 [away home movie sleep wake] / 青岛场景 [away home sleep vent]
+```
+
+**两家各存一条"空调温度"（真实记忆库 `data/homemind.db`）**：
+
+```
+family_qd | member_101 | preference:空调温度 = 喜欢空调开20度          (v1)
+family_sz | member_001 | preference:空调温度 = 喜欢睡觉时空调26度      (v1)
+```
+
+同一个 key、不同值、**谁也没覆盖谁**。
+
+#### 顺手修掉的三个坑（都不是 S2 计划内的）
+
+1. **`reset_devices()` 在 `device_server.py` 里定义了两次**，第二个把第一个整个覆盖掉了。只剩一个，按家庭分桶重置。
+2. **两个记忆库分裂**：AI 助手写 `data/homemind_memory.db`，控制台"我的习惯"页读 `data/homemind.db` → **AI 刚记住的习惯，习惯页里查不到**。统一默认库为 `data/homemind.db`，并把旧库数据按"目标库不存在才搬"合并过去（深圳那条 key 冲突，保留你原来的真实记忆，不覆盖）。
+3. **`/habits` 接口漏 import 直接 500，而当时没有任何用例覆盖它**——是人在浏览器点才发现的。补了 `test_habits_contract`。教训：没被断言的接口等于没有接口。
+
+#### 测试用例（`tests/test_tenant_isolation.py` 8 条）
+
+| 用例 | 契约 |
+|---|---|
+| `test_qingdao_cannot_see_shenzhen_devices` | 硬指标 1：两家设备清单互不可见 |
+| `test_cross_family_control_403_no_side_effect` | 硬指标 2：403 且**状态一点没变** |
+| `test_device_tool_only_touches_own_family` | 工具层隔离（不经 API，证明隔离在设备层而不是靠接口层 if） |
+| `test_two_families_keep_own_temperature` | 硬指标 3：同 key 不同值，互不覆盖 |
+| `test_recall_does_not_leak_across_families` | 拿错 family_id 召回 → 空 |
+| `test_task_of_other_family_not_found` | 别家任务 404 |
+| `test_scene_list_differs_per_family` | 场景清单按家庭不同 |
+| `test_short_term_session_isolated_by_family` | 会话键带 family，换家不串台 |
+
+测试总数 75 → **84 passed**；一键自检 **9/9 全绿**。
+
+> ⚠️ **踩坑**：测试里同时建两个 TestClient 会踩 `app.dependency_overrides` 全局单例的坑——后建的身份覆盖先建的，于是"深圳的 client"发请求时身份已经是青岛了。解法是包一层 `_TenantClient`，**每次发请求前把身份切回自己那份**。
+
+#### 关于 S3
+
+场景、任务、消息、环境基线（深圳 24.5°C/晴 vs 青岛 18.2°C/海雾）的差异化种子数据**已在 S2 里一并做掉**——不做的话小明会看到深圳的家务清单，本身就是隔离漏洞。S3 剩下的是更细的打磨（更丰富的任务与设备），可按需补。

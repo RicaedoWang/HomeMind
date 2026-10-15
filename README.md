@@ -397,12 +397,17 @@ HM_USE_MOCK_LLM=true python scripts/web_ui.py   # 省钱版，不烧 token
 # 推荐：脚本自己把 src 挂进 sys.path，cmd / PowerShell / Anaconda Prompt 都能跑
 python scripts/console_server.py            # 默认 http://127.0.0.1:8000
 python scripts/console_server.py 8001       # 换端口
+python scripts/console_server.py --mock     # 规则模式（大模型抽风时的救急开关）
 
 # 或者双击项目根目录的 run_console.bat（写死了 homemind 环境的 python 全路径）
 
 # 启动后会自动打开浏览器；想手动开就在浏览器输入打印出来的地址，
 # 或在终端里：start http://127.0.0.1:8000
 # 端口被占（10048 错误）时脚本会自动顺延到下一个空闲端口，不会再炸。
+
+# --mock 什么时候用：大模型服务不可用（如 2026-10-15 DeepSeek 全线 30 秒超时）时，
+# 不加参数每次对话要干等两次 30 秒超时才降级；加 --mock 直接走规则，秒回。
+# 规则模式下意图解析、工具调用、记忆读写全部照常，只是应答文案是模板。
 
 # 手机上看：把 127.0.0.1 换成电脑局域网 IP（ipconfig 里的 IPv4 地址）
 ```
