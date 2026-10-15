@@ -1,12 +1,16 @@
 # HomeMind · 智能家居多智能体中枢
 
-> 当前状态：**V0.8 已完成**。主链路（听懂 → 规划 → 安全护栏 → 调工具 → 应答）+ 三层记忆系统
-> （写入 / 召回排序 / 冲突更新 / 遗忘 / 权限隔离）+ 多 Agent 协同 + 端到端评测体系
-> 均已跑通，真大模型（DeepSeek）已接入并带降级，**58 个单元测试全绿**（3~6s，确定性执行）。
+> 当前状态：**V1.0（多租户与安全隔离）**。主链路（听懂 → 规划 → 安全护栏 → 调工具 → 应答）
+> + 三层记忆系统（写入 / 召回排序 / 冲突更新 / 遗忘 / 权限隔离）+ 多 Agent 协同
+> + 端到端评测体系 + **登录鉴权 / 家庭级租户隔离**均已跑通；真大模型（DeepSeek）已接入并带降级，
+> **84 个单元测试全绿**（约 5s，确定性执行：不联网、不花钱）。
 > Web 控制台（`http://127.0.0.1:8000`）按《界面设计文档 v1.1》实现：任务优先、深色优先、
 > 玻璃拟态、三大手势、AI 交互区，与后端共用同一份设备状态。
 > 配套文档：《HomeMind_软件需求规格说明书_SRS.md》《HomeMind_项目进度总结与下一步规划.md》
-> 《HomeMind_技术栈清单.md》
+> 《HomeMind_技术栈清单.md》《HomeMind_多用户与隔离实现方案.md》
+>
+> **怎么确认以上每一句都不是吹的**：跑 `python scripts/verify_all.py`，九项自检逐条验给你看。
+> 详见 [2.3 检查项目进度](#23-检查项目进度一条命令看完)。
 
 ---
 
@@ -71,15 +75,24 @@ D:\anaconda\envs\homemind\python.exe scripts/demo.py
 conda activate homemind
 pip install -r requirements.txt
 python scripts/demo.py               # V0.1 主链路演示
-python scripts/demo_memory.py        # V0.5 记忆系统能力演示
-python scripts/demo_agent_memory.py  # V0.5 记忆接入 Agent（记忆改变行为）
-python scripts/demo_multi_agent.py   # V0.8 多 Agent 协同（六段）
+python scripts/demo_memory.py        # 记忆系统能力演示（写入/召回/冲突/权限/遗忘/衰减）
+python scripts/demo_agent_memory.py  # 记忆接入 Agent（记忆真的改变行为）
+python scripts/demo_multi_agent.py   # 多 Agent 协同（六段）
 python scripts/chat_cli.py           # 交互式命令行：问答式定制家居习惯
-python scripts/run_eval.py           # 端到端评测（49 条用例 + 红线否决）
-python scripts/verify_all.py         # 一键自检：把上面这些全跑一遍并汇总
+python scripts/run_eval.py           # 端到端评测（49 条用例 + 红线一票否决）
+python scripts/verify_all.py         # ★ 一键自检：九项全跑并汇总（见 2.3）
 python scripts/web_ui.py             # Gradio Web 界面（可视化链路 + 一键评测）
-pytest -q
+
+# Web 控制台（推荐给外人看的就是这个）
+python scripts/console_server.py            # 默认 http://127.0.0.1:8000，自动开浏览器
+python scripts/console_server.py --mock     # 规则模式：大模型不可用时照常演示
+
+pytest -q                                   # 只跑单元测试（约 5s）
 ```
+
+> 所有命令都用 `python scripts/xxx.py` 形式，**不要**用 `PYTHONPATH=src python ...`
+> 那种前缀赋值写法——那是 bash 语法，Windows 传统终端会报
+> "不是内部或外部命令"。脚本自己会把 `src` 挂进 `sys.path`。
 
 ### 💬 交互式定制你的家居习惯（推荐先玩这个）
 
@@ -123,6 +136,57 @@ index-url = https://pypi.tuna.tsinghua.edu.cn/simple   ← 正确
 Windows 下 pip 用系统 locale（GBK）读 requirements 文件，
 UTF-8 中文注释会让它把包名解析坏，报同样的 `from versions: none`。
 所以本项目的 `requirements.txt` **刻意保持纯 ASCII**，注释用英文——别改成中文。
+
+### 2.3 检查项目进度：一条命令看完
+
+```bash
+python scripts/verify_all.py
+```
+
+它做的事是**把本文档宣称的每一条能力都真跑一遍**——不是读版本号、不是数文件行数。
+九项逐条打勾，末尾给汇总；全通过退出码 0，任何一项挂掉则非 0（可以直接挂 CI）。
+
+| 自检项 | 实际在验什么 |
+|---|---|
+| 单元测试 | **84 条**：租户隔离 8 / 认证 11 / 控制台契约 9 / 多轮记忆 6 / 评测框架 11 … |
+| 端到端评测 | 49 条用例，红线 8/8，**红线失败即整体不合格** |
+| 多 Agent 协同 | 六段：单领域分派 / 多领域并发 / 知识问答 / 越权拦截 / 冲突检测 / 失败隔离 |
+| 记忆系统 | 写入 → 召回 → 冲突更新 → 权限 → 遗忘 → 衰减 |
+| 主链路 | V0.1 七条用例 |
+| API 冒烟 | 接口全 200 |
+| Web 控制台 | 控制台契约（含"先调工具再读状态"那条回归） |
+| Git 仓库 | 当前 HEAD + 工作区是否干净 |
+| Web 界面 | 前端能否构建 |
+
+真实输出（2026-10-15 实跑）：
+
+```
+【汇总】
+  Python 文件 63 个，代码 9442 行
+  40 个提交，工作区干净
+  自检项通过 9/9
+✅ 全部自检通过。项目成果完整。
+```
+
+**默认强制 mock（把大模型伪掉）是有意的**：自检要回答的是"东西全不全、有没有崩"，
+不是"模型今天状态好不好"。用真模型会把 DeepSeek 的网络波动误判成项目 bug。
+想连真模型验证：
+
+```bash
+python scripts/verify_all.py --real
+```
+
+只想看某一项：
+
+```bash
+pytest -q                  # 单元测试（约 5s）
+python scripts/run_eval.py # 端到端评测 + 红线否决
+```
+
+**机器自检之外，人读的进度**在这两份（会随里程碑更新）：
+
+- 《HomeMind_项目进度总结与下一步规划.md》—— 能力盘点、下一步排序（N1–N6）
+- 《HomeMind_多用户与隔离实现方案.md》—— 多租户 S1–S6 的落地记录与验收输出
 
 ### 2.4 接真大模型（可选，三步）
 
@@ -189,25 +253,59 @@ homemind/
 │   ├── config.py              全局配置（全环境变量驱动，改配置不改代码）
 │   ├── core/
 │   │   ├── trace.py           traceId + 结构化 JSON 日志 + 耗时 span
-│   │   └── models.py          Intent / Task / ToolResult / DeviceState 数据模型
+│   │   ├── models.py          Intent / Task / ToolResult / DeviceState 数据模型
+│   │   ├── llm.py             大模型客户端（含降级判定）
+│   │   └── tenancy.py         ★ 租户常量：DEFAULT_FAMILY_ID / __family_id（零依赖，谁都能 import）
+│   ├── auth/                  ★ 登录鉴权（独立库 data/homemind_accounts.db，不碰记忆库）
+│   │   ├── passwords.py       PBKDF2-SHA256 哈希 + 定长比对
+│   │   ├── tokens.py          JWT 签发/校验 + AuthUser
+│   │   ├── store.py           账号存储 + 四账号种子 + 登录失败限流
+│   │   └── deps.py            current_user 依赖注入（身份只从 token 取）
 │   ├── agent/
-│   │   ├── state.py           AgentState（LangGraph 状态定义）
+│   │   ├── state.py           AgentState（含 family_id / 多轮 chat_history）
 │   │   ├── intent.py          意图识别：规则模式 + 大模型模式双模
 │   │   ├── time_parser.py     时间语义解析（"明天早上九点" → ISO 时间戳）
-│   │   └── graph.py           LangGraph 状态图：四个节点 + 条件边
+│   │   ├── execution.py       共享执行原语：幂等键 / 增量解析 / 记忆补全 / 租户注入
+│   │   └── graph.py           主链路六节点 + 记忆查询分支
+│   ├── agents/                多 Agent：supervisor + device / schedule / knowledge 子 Agent
 │   ├── tools/
 │   │   ├── registry.py        工具注册中心：Schema + 超时/重试/熔断/幂等
-│   │   ├── device_server.py   设备控制 MCP Server（Mock 设备层）
+│   │   ├── device_server.py   ★ 设备按家庭分桶（深圳 10 台 / 青岛 6 台）
 │   │   └── calendar_server.py 日程提醒 MCP Server
 │   ├── memory/
-│   │   └── short_term.py      短期记忆（Redis，可降级内存）
-│   └── api/main.py            FastAPI 接口
-├── scripts/demo.py            命令行链路演示
-├── scripts/smoke_api.py       API 冒烟测试
-├── tests/test_pipeline.py     回归测试（12 用例）
-├── sql/init.sql               数据库 DDL（V0.5 记忆系统预留）
+│   │   ├── short_term.py      滑动窗口 + 超限摘要压缩（Redis / 降级内存）
+│   │   ├── long_term.py       SQLite 长期记忆（表结构对齐 MySQL，唯一键含 family_id）
+│   │   ├── semantic.py        语义召回（无 embedding 时 bigram Jaccard 降级）
+│   │   └── service.py         统一门面：写入 / 召回排序 / 冲突更新 / 遗忘
+│   ├── eval/                  端到端评测：49 条用例 + 红线一票否决 + 报告
+│   └── api/
+│       ├── main.py            FastAPI 入口
+│       ├── auth.py            /login /me /logout /accounts
+│       └── console.py         控制台 REST + 静态站点托管
+├── web/                       ★ 零构建原生前端（不上 React/Vite）
+│   ├── index.html             含 31 个内联 SVG symbol 图标
+│   └── assets/                tokens.css（Design Token）/ app.css / app.js
+├── scripts/                   demo / run_eval / verify_all / console_server / chat_cli …
+├── tests/                     84 条契约测试（见下）
+├── sql/init.sql               数据库 DDL（已补 family_id + 唯一约束）
 ├── docker-compose.yml         全套服务编排
 └── Dockerfile                 应用镜像
+```
+
+**测试分布（84 条，`pytest -q` 约 5s）**
+
+| 文件 | 条数 | 守住的东西 |
+|---|---|---|
+| `test_pipeline.py` | 12 | V0.1 主链路回归（意图 → 护栏 → 工具 → 应答） |
+| `test_multi_agent.py` | 12 | 分派 / 子 Agent 白名单越权 / 冲突前置拦截 / 失败隔离 |
+| `test_eval.py` | 11 | 评测框架本身：红线一票否决、红线禁止标 known_gap、统计口径 |
+| `test_auth.py` | 11 | 无 token、错 token、过期 token 均 401；身份只从 token 取；限流 |
+| `test_memory.py` | 9 | 记忆写入召回、冲突更新、权限分级、遗忘 |
+| `test_console.py` | 9 | 控制台契约：先调工具再读状态、门锁要确认、习惯页不 500 |
+| `test_tenant_isolation.py` | 8 | 跨家庭看不到 / 403 零副作用 / 同 key 互不覆盖 / 工具层隔离 |
+| `test_chat_memory.py` | 6 | 多轮记忆：窗口压缩留摘要、按成员隔离、登出清空 |
+| `test_agent_memory.py` | 6 | 记忆真的改变行为（"把空调打开" → 按记忆设 26 度） |
+| **合计** | **84** | |
 ```
 
 ---
@@ -274,21 +372,29 @@ time_decay = exp(-λ × Δt)      λ 默认 0.01/天
 |---|---|---|
 | **V0.1** | 意图识别、多意图拆分、时间解析、MCP 工具注册中心、安全护栏、链路追踪、短期记忆、FastAPI | ✅ 已完成 |
 | **V0.5** | 记忆服务核心 + 接入 Agent 图：写入/召回排序/冲突更新/遗忘/权限隔离/记忆影响参数 | ✅ 已完成 |
-| **V0.8** | Supervisor 多 Agent 协同、子 Agent 工具白名单、执行前冲突检测、RAG 知识库（本地检索版） | ✅ 已完成 |
-| V0.9 | Milvus 真向量、视觉分析、模型分级路由、多租户隔离 | 规划中 |
-| V1.0 | 评测体系、灰度发布、异常回退、指标监控 | 规划中 |
+| **V0.8** | Supervisor 多 Agent 协同、子 Agent 工具白名单、执行前冲突检测、RAG 知识库（本地检索版）、端到端评测体系（49 条 + 红线否决） | ✅ 已完成 |
+| **V0.9** | Web 控制台（按《界面设计文档 v1.1》：任务优先/深色优先/玻璃拟态/三大手势/AI 交互区）、多轮对话记忆（滑动窗口 + 超限摘要压缩） | ✅ 已完成 |
+| **V1.0** | **多租户与安全隔离**：登录鉴权（JWT + PBKDF2 + 限流）、四账号两家庭、`family_id` 贯穿设备/记忆/会话/任务/场景、跨家庭访问 403 | ✅ 已完成 |
+| 下一步 | `operation_log` 审计表（S4）→ 一致性四件套：幂等 Redis 化 / 设备锁 / 场景补偿（S5）→ 前端日志页（S6） | 进行中 |
+| 未启动 | Milvus 真向量、视觉分析、模型分级路由、灰度发布、指标监控 | 未启动 |
+
+> **诚实边界**（面试别吹这几条）：Redis 代码完整但本机没起服务 → 跑的是内存降级；
+> Milvus 只做了设计没接 → 语义召回跑的是 bigram Jaccard；MySQL 只有 `sql/init.sql` 的 DDL
+> → 实际跑的是 SQLite；Docker Compose 文件在但本机没实跑过；控制台能耗数据是种子值，不是真统计。
+> 完整清单见《HomeMind_技术栈清单.md》的"实际在用 / 降级 / 仅预留"分类表。
 
 ### V0.5 记忆系统现状
 
 | 能力 | 实现 | 存储 |
 |---|---|---|
-| 短期记忆 | 会话上下文，滑动窗口 + TTL | Redis（降级内存） |
-| 长期结构化记忆 | 偏好 / 成员画像 / 设备习惯 / 场景 | SQLite（表结构对齐 MySQL，切后端只改配置） |
+| 短期记忆 | 会话上下文，**滑动窗口 + 超限摘要压缩**（超 2×窗口时溢出部分压成摘要，原文裁到窗口——控 token 又不丢信息）+ TTL；会话键 `console:{family}:{member}`，换家不串台 | Redis（降级内存） |
+| 长期结构化记忆 | 偏好 / 成员画像 / 设备习惯 / 场景；**唯一键 `(family_id, member_id, memory_key)`**，两家可各存一条同 key 记忆 | SQLite（表结构对齐 MySQL，切后端只改配置；老库缺列时自动迁移） |
 | 语义记忆 | 向量化 + 相似度召回 | 内存（无 embedding 时用 bigram Jaccard 降级） |
 | 召回排序 | 语义 × 时效 × 重要度 加权 | — |
 | 冲突更新 | 同 key 版本 +1 + 变更留痕 | memory_history 表 |
 | 遗忘 | 主动硬删除 / 自然衰减清理 | — |
-| 权限 | 四级角色，召回阶段过滤 | visible_role 字段 |
+| 权限 | 四级角色，召回阶段过滤 | `visible_role` 字段 |
+| **租户隔离** | 召回时再按 `family_id` 拦一道（纵深防御，防 member_id 撞号）；跨家庭写入相互不可见 | `family_id` 字段 |
 
 演示：`python scripts/demo_memory.py`，会跑完写入 → 召回 → 冲突更新 → 权限隔离 → 遗忘 → 衰减六段。
 
@@ -388,6 +494,61 @@ HM_USE_MOCK_LLM=true python scripts/web_ui.py   # 省钱版，不烧 token
 
 界面记忆与 `scripts/chat_cli.py` 共用 `data/homemind.db`，
 网页里记下的习惯，命令行里一样认。
+
+---
+
+## 五之三、多租户与安全隔离（V1.0）
+
+**租户 = 家庭。** 深圳家（我 / 妈妈 / 爸爸）和青岛家（小明）是两套完全独立的数据，
+连"客厅灯"都是两台不同的设备——只是恰好同名。
+
+### 演示账号（密码统一 `demo1234`）
+
+| 用户名 | 家庭 | 角色 | 城市 |
+|---|---|---|---|
+| `wo` | 深圳的家 | L4 管理员 | 深圳 |
+| `mama` | 深圳的家 | L3 共同管理 | 深圳 |
+| `baba` | 深圳的家 | L3 成员 | 深圳 |
+| `xiaoming` | 青岛的家 | L4 管理员 | 青岛 |
+
+登录深圳家再登录青岛家，能看到的是**两套设备、两套任务、两套场景、两套 AI 记忆**。
+
+### `family_id` 怎么穿透的（面试重点）
+
+```
+token（JWT，含 family_id / member_id / role）
+   ↓ current_user 依赖注入
+FastAPI 接口 → 取资源前做家庭断言：不属于 → 403，且零副作用
+   ↓
+AgentState.family_id
+   ↓ agent/execution.py 统一注入（治理只有这一处）
+arguments["__family_id"]  ← 服务端权威值
+   ↓
+设备 handler / 记忆读写 / 短期记忆会话键
+```
+
+关键取舍：`__family_id` **不写在工具的 JSON Schema 里**，模型看不见也造不出来；
+处理时也刻意不读不带下划线的同名参数。
+否则用户一句"去把小明家的灯关了"，模型就可能真的传个 `family_id=family_qd` 执行掉——
+**租户边界必须由服务端说了算，不能交给模型输出。**
+
+### 三条验收标准（实测输出）
+
+```
+① 小明看不到深圳设备          → True（深圳 10 台 / 青岛 6 台，清单完全不同）
+② 小明控制深圳空调            → 403 无权操作该设备，且该空调状态一点没变
+③ 两家各存一条"空调温度"      → 同 key、不同值、谁也没覆盖谁
+     family_qd | preference:空调温度 = 喜欢空调开20度
+     family_sz | preference:空调温度 = 喜欢睡觉时空调26度
+```
+
+> 跨家庭访问返回的是 **403 而不是 404**：404 等于告诉对方"这个 id 存在但不属于你"，
+> 是免费的资源枚举线索。
+
+> **诚实说明**：登录时服务端确实记录了真实客户端 IP，但"深圳 / 青岛"这个城市字段
+> 来自账号档案的 seed 数据，**没有做真实 GeoIP 定位**。面试照这个口径说，别吹成"按 IP 识别家庭"。
+
+完整设计与逐步落地记录见《HomeMind_多用户与隔离实现方案.md》。
 
 ---
 
