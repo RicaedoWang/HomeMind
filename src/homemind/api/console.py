@@ -29,11 +29,24 @@ from ..agent.graph import build_agent_graph
 from ..auth.deps import current_user
 from ..auth.tokens import AuthUser
 from ..agent.state import initial_state
+from .events import (  # noqa: E402
+    TYPE_DEVICE,
+    TYPE_SCENE,
+    TYPE_SECURITY,
+    TYPE_SYSTEM,
+    TYPE_TASK,
+    events_of,
+    mark_all_read,
+    mark_read,
+    record_event,
+    reset_events,
+    unread_count,
+)
 from ..auth.store import FAMILIES
 from ..core.trace import get_logger, new_trace_id, set_trace_id
 from ..memory.service import get_memory_service
 from ..memory.short_term import get_short_term_memory
-from ..tools.calendar_server import get_schedules
+from ..tools.calendar_server import delete_schedule, get_schedules, reset_schedules
 from ..core.tenancy import DEFAULT_FAMILY_ID, FAMILY_ARG
 from ..tools.device_server import devices_of, get_device_states
 from ..tools.registry import default_registry
@@ -99,6 +112,7 @@ CATEGORY_COLORS = {
     "plant": "#34D399", "laundry": "#60A5FA", "cleaning": "#A78BFA",
     "pet": "#FBBF24", "security": "#F87171", "shopping": "#F472B6",
     "maintenance": "#22D3A8", "health": "#FB923C", "other": "#94A3B8",
+    "reminder": "#A78BFA",   # AI 创建的提醒
 }
 
 # ---------------------------------------------------------------- 任务存储
@@ -201,6 +215,17 @@ def reset_tasks() -> None:
     _seed_tasks()
 
 
+def reset_console_state() -> None:
+    """测试前置：任务与事件流一起打回原点。
+
+    两者必须一起清，否则会出现"任务重置了、消息里还留着上一条完成记录"
+    这种前后撕裂的状态，测试断言就不可复现了。
+    """
+    reset_tasks()
+    reset_schedules()
+    reset_events()
+
+
 _seed_tasks()
 
 # ---------------------------------------------------------------- 派生数据
@@ -261,6 +286,44 @@ def _device_payload(family_id: str) -> list[dict[str, Any]]:
             payload["control"] = "switch"
         devices.append(payload)
     return devices
+
+
+def _schedule_to_task(schedule: dict[str, Any]) -> dict[str, Any]:
+    """把一条 AI 创建的提醒转成任务卡片结构。
+
+    为什么要转：家务任务存在 `console._TASKS`，AI 创建的提醒存在
+    `calendar_server._SCHEDULES`，是两套存储。不合并的话，
+    用户跟 AI 说"提醒我晚上九点关灯"，AI 回"已创建"，
+    但今日任务框里**什么都不出现**——像被吞了一样。
+
+    合并放在展示层而不是强行塞进同一张表：家务任务和日程的生命周期不同
+    （家务有联动设备、日程没有），硬合成一套只会互相污染。
+    """
+    when = schedule.get("scheduled_at", "")
+    return {
+        "id": schedule["schedule_id"],
+        "title": schedule.get("content", "提醒"),
+        "description": f"AI 助手创建 · 时间 {when.replace('T', ' ')[:16]}",
+        "iconKey": "bell",
+        "category": "reminder",
+        "source": "ai",
+        "creatorId": "ai",
+        "assigneeIds": [],
+        "roomId": "",
+        "dueAt": when,
+        "priority": "normal",
+        "status": schedule.get("status", "pending"),
+        "linkedDeviceIds": [],
+        "completionAction": "notify-only",
+        "isSchedule": True,     # 前端据此走"提醒"而不是"家务"的交互文案
+        "createdAt": schedule.get("created_at", ""),
+    }
+
+
+def _find_schedule(family_id: str, schedule_id: str) -> dict[str, Any] | None:
+    """在本家庭的日程里找一条（别家的找不到）。"""
+    return next((s for s in get_schedules(family_id)
+                 if s["schedule_id"] == schedule_id), None)
 
 
 # 两个家庭的室内外环境基线（演示用种子数据，不是真实传感器读数）
@@ -343,26 +406,10 @@ def _energy_payload() -> dict[str, Any]:
     return {"today": 3.2, "unit": "kWh", "delta": -12, "week": 24.6, "month": 108.4}
 
 
-_MESSAGES: dict[str, list[dict[str, Any]]] = {
-    "family_sz": [
-        {"id": "msg-1", "type": "device", "title": "洗衣机洗涤完成",
-         "body": "已自动生成「晾晒衣服」任务", "time": "12 分钟前", "unread": True},
-        {"id": "msg-2", "type": "security", "title": "入户门锁 18:20 开启",
-         "body": "由「爸爸」的指纹开启", "time": "1 小时前", "unread": True},
-        {"id": "msg-3", "type": "system", "title": "滤芯寿命不足 10%",
-         "body": "空气净化器滤芯建议更换", "time": "昨天", "unread": False},
-    ],
-    "family_qd": [
-        {"id": "msg-qd-1", "type": "device", "title": "新风滤芯寿命剩余 8%",
-         "body": "已自动生成「更换新风滤芯」任务", "time": "30 分钟前", "unread": True},
-        {"id": "msg-qd-2", "type": "system", "title": "室外海雾预警",
-         "body": "湿度偏高，建议开启通风模式", "time": "2 小时前", "unread": False},
-    ],
-}
-
-
-def _messages_payload(family_id: str) -> list[dict[str, Any]]:
-    return _MESSAGES.get(family_id, _MESSAGES[DEFAULT_FAMILY_ID])
+# 消息中心**没有种子数据**——它就是 events.py 里那条真实事件流。
+# 以前这里写死三条"洗衣机洗涤完成""门锁 18:20 开启"，用户点开就穿帮：
+# 他刚把灯关了，消息却还在讲洗衣机。现在每一条都对应一次真实操作，
+# 谁做的、几点做的、动了哪台设备，全是真的。
 
 
 # ---------------------------------------------------------------- 接口
@@ -373,7 +420,8 @@ async def console_state(user: AuthUser = Depends(current_user)) -> dict[str, Any
     """控制台全量状态：一次请求拿齐首页所需数据，**且只含本家庭的数据**。"""
     family_id = user.family_id
     env = _env_payload(family_id)
-    tasks = tasks_of(family_id)
+    # 今日任务 = 家务任务 + AI 创建的提醒（两套存储在展示层合并）
+    tasks = [_schedule_to_task(s) for s in get_schedules(family_id)] + tasks_of(family_id)
     pending = [t for t in tasks if t["status"] == "pending"]
     devices = _device_payload(family_id)
     return {
@@ -386,9 +434,10 @@ async def console_state(user: AuthUser = Depends(current_user)) -> dict[str, Any
         "rooms": sorted({d["room"] for d in devices}),
         "scenes": [{"id": s["id"], "name": s["name"], "icon": s["icon"]}
                    for s in SCENES.get(family_id, [])],
-        "schedules": get_schedules(),
+        "schedules": get_schedules(family_id),
         "energy": _energy_payload(),
-        "messages": _messages_payload(family_id),
+        "messages": events_of(family_id),
+        "unreadCount": unread_count(family_id),
         "family": FAMILY_MEMBERS.get(family_id, []),
         # 身份回显：前端据此显示"谁在看这个家"
         "viewer": {**user.to_dict(),
@@ -444,6 +493,19 @@ async def control_device(
         arguments["value"] = req.value
 
     result = await registry.call(tool_name, arguments)
+
+    # 真实事件：只有真的动了才记，失败/被拦的不记（消息中心不放假消息）
+    if result.ok:
+        verb = "打开" if req.action == "turn_on" else "关闭"
+        kind = TYPE_SECURITY if device.device_type == "lock" else TYPE_DEVICE
+        record_event(
+            family_id, kind,
+            title=f"{verb}了{device.name}" if device.device_type != "lock"
+                  else f"{'开锁' if req.action == 'turn_on' else '上锁'}：{device.name}",
+            body=f"位置：{device.room} · 操作人：{user.name}",
+            actor=user.name,
+        )
+
     # 注意顺序：必须在工具调用之后再取设备状态，否则前端拿到的是执行前的旧值，
     # 会显示"后端说开了、卡片还关着"。
     return {"ok": result.ok, "tool": tool_name,
@@ -487,6 +549,14 @@ async def activate_scene(
         affected.append({"deviceId": device_id, "name": device.name,
                          "ok": result.ok,
                          "message": (result.data or {}).get("message", "")})
+
+    done = [a for a in affected if a["ok"]]
+    record_event(
+        family_id, TYPE_SCENE,
+        title=f"执行了「{scene['name']}」模式",
+        body=f"联动 {len(done)} 台设备：{'、'.join(a['name'] for a in done) or '无'}",
+        actor=user.name,
+    )
     return {"ok": True, "scene": scene["name"], "affected": affected}
 
 
@@ -509,8 +579,21 @@ def _find_task(family_id: str, task_id: str) -> dict[str, Any]:
 async def complete_task(
     task_id: str, req: TaskActionRequest, user: AuthUser = Depends(current_user)
 ) -> dict[str, Any]:
-    """完成任务：置为 done，并触发关联设备联动。"""
+    """完成任务：置为 done，并触发关联设备联动。
+
+    两种任务都支持：家务任务（带设备联动）和 AI 创建的提醒（只置为完成）。
+    """
     family_id = user.family_id
+
+    schedule = _find_schedule(family_id, task_id)
+    if schedule is not None:
+        schedule["status"] = "done"
+        record_event(family_id, TYPE_TASK,
+                     title=f"提醒已完成：{schedule['content']}",
+                     body=f"操作人：{user.name} · 由 AI 助手创建",
+                     actor=user.name)
+        return {"ok": True, "task": _schedule_to_task(schedule), "linked": []}
+
     task = _find_task(family_id, task_id)
     task["status"] = "done"
     task["completedAt"] = datetime.now().isoformat()
@@ -530,6 +613,14 @@ async def complete_task(
         linked.append({"deviceId": device_id, "name": device.name,
                        "ok": result.ok,
                        "message": (result.data or {}).get("message", "")})
+
+    ok_linked = [l["name"] for l in linked if l["ok"]]
+    record_event(
+        family_id, TYPE_TASK,
+        title=f"完成了「{task['title']}」",
+        body=f"完成人：{user.name}" + (f" · 已联动：{'、'.join(ok_linked)}" if ok_linked else ""),
+        actor=user.name,
+    )
     return {"ok": True, "task": task, "linked": linked}
 
 
@@ -538,11 +629,29 @@ async def cancel_task(
     task_id: str, req: TaskActionRequest, user: AuthUser = Depends(current_user)
 ) -> dict[str, Any]:
     """取消任务：保留记录（不物理删除），可追溯。"""
-    task = _find_task(user.family_id, task_id)
+    family_id = user.family_id
+
+    schedule = _find_schedule(family_id, task_id)
+    if schedule is not None:
+        schedule["status"] = "cancelled"
+        schedule["cancelReason"] = req.reason or "未填写原因"
+        record_event(family_id, TYPE_TASK,
+                     title=f"取消了提醒：{schedule['content']}",
+                     body=f"取消人：{user.name} · 原因：{schedule['cancelReason']}",
+                     actor=user.name)
+        return {"ok": True, "task": _schedule_to_task(schedule)}
+
+    task = _find_task(family_id, task_id)
     task["status"] = "cancelled"
     task["cancelReason"] = req.reason or "未填写原因"
     task["cancelledAt"] = datetime.now().isoformat()
     task["cancelledBy"] = user.member_id
+    record_event(
+        user.family_id, TYPE_TASK,
+        title=f"取消了「{task['title']}」",
+        body=f"取消人：{user.name} · 原因：{task['cancelReason']}",
+        actor=user.name,
+    )
     return {"ok": True, "task": task}
 
 
@@ -550,12 +659,60 @@ async def cancel_task(
 async def reopen_task(
     task_id: str, user: AuthUser = Depends(current_user)
 ) -> dict[str, Any]:
-    """撤销：把任务从 done/cancelled 回滚到 pending。"""
-    task = _find_task(user.family_id, task_id)
+    """撤销：把任务从 done/cancelled 回滚到 pending。
+
+    AI 创建的提醒（日程）也走这个口子：任务页的「恢复」按钮对两类任务
+    一视同仁，后端要是只认家务任务，用户点下去就是 404，
+    前端只能弹「撤销失败」——点了没反应，是这套界面最忌讳的事。
+    """
+    family_id = user.family_id
+
+    schedule = _find_schedule(family_id, task_id)
+    if schedule is not None:
+        schedule["status"] = "pending"
+        schedule.pop("cancelReason", None)
+        record_event(
+            family_id, TYPE_TASK,
+            title=f"恢复了提醒：{schedule['content']}",
+            body=f"已重新放回待办 · 操作人：{user.name}",
+            actor=user.name,
+        )
+        return {"ok": True, "task": _schedule_to_task(schedule)}
+
+    task = _find_task(family_id, task_id)
     task["status"] = "pending"
     for key in ("completedAt", "completedBy", "cancelledAt", "cancelledBy", "cancelReason"):
         task.pop(key, None)
+    record_event(
+        family_id, TYPE_TASK,
+        title=f"恢复了「{task['title']}」",
+        body=f"已重新放回待办 · 操作人：{user.name}",
+        actor=user.name,
+    )
     return {"ok": True, "task": task}
+
+
+@router.delete("/schedules/{schedule_id}")
+async def delete_schedule_api(
+    schedule_id: str, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
+    """删除一条 AI 创建的提醒（物理删除）。
+
+    只删本家庭的：拿别家的 schedule_id 来删，返回 404 且**一条都不动**。
+    删掉之后它会从今日任务框里消失——这也是它唯一的去处，
+    所以这条接口不能少，否则提醒只能加不能减。
+    """
+    family_id = user.family_id
+    removed = delete_schedule(family_id, schedule_id)
+    if removed is None:
+        raise HTTPException(status_code=404, detail="提醒不存在或不属于当前家庭")
+    record_event(
+        family_id, TYPE_SYSTEM,
+        title=f"删除了提醒：{removed['content']}",
+        body=f"原定时间：{removed['scheduled_at']} · 操作人：{user.name}",
+        actor=user.name,
+    )
+    return {"ok": True, "removed": removed["schedule_id"]}
 
 
 class AssistantRequest(BaseModel):
@@ -611,13 +768,37 @@ async def assistant(
     actions = []
     for res in result.get("tool_results", []):
         data = res.get("data") or {}
+        tool = res.get("tool_name")
         actions.append({
-            "tool": res.get("tool_name"),
+            "tool": tool,
             "ok": res.get("ok"),
-            "title": data.get("message") or res.get("tool_name"),
+            "title": data.get("message") or tool,
             "deviceId": (data.get("device") or {}).get("device_id"),
             "error": res.get("error"),
         })
+
+        # AI 干的事也要进消息中心——不然用户让 AI 开了灯，
+        # 消息里却只有他自己手动操作的记录，看着像漏了一半。
+        if not res.get("ok") or not data.get("success", True):
+            continue
+        if tool == "create_reminder" and not data.get("duplicate"):
+            schedule = data.get("schedule") or {}
+            record_event(
+                user.family_id, TYPE_SYSTEM,
+                title=f"AI 添加了提醒：{schedule.get('content', '新提醒')}",
+                body=f"时间：{schedule.get('scheduled_at', '待定')} · 由「{user.name}」对话创建",
+                actor=user.name,
+            )
+        elif tool in ("device_control", "lock_control"):
+            device = data.get("device") or {}
+            record_event(
+                user.family_id,
+                TYPE_SECURITY if tool == "lock_control" else TYPE_DEVICE,
+                title=data.get("message") or "AI 操作了设备",
+                body=f"由「{user.name}」对 AI 说：{req.text[:30]}"
+                     + (f" · 位置：{device.get('room', '')}" if device.get("room") else ""),
+                actor=user.name,
+            )
 
     return {
         "traceId": trace_id,
@@ -629,6 +810,27 @@ async def assistant(
         "confirmPrompt": result.get("confirm_prompt", ""),
         "degraded": result.get("degraded", False),
     }
+
+
+@router.post("/messages/{event_id}/read")
+async def read_message(
+    event_id: str, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
+    """把一条消息标为已读。
+
+    消息条目能点，点的就是这个——点击必须产生真实状态变化，
+    否则"看起来能点其实没反应"比"明确不可点"更让人恼火。
+    """
+    if not mark_read(user.family_id, event_id):
+        raise HTTPException(status_code=404, detail="消息不存在或不属于当前家庭")
+    return {"ok": True, "unreadCount": unread_count(user.family_id)}
+
+
+@router.post("/messages/read-all")
+async def read_all_messages(user: AuthUser = Depends(current_user)) -> dict[str, Any]:
+    """一键全部标记已读。"""
+    marked = mark_all_read(user.family_id)
+    return {"ok": True, "marked": marked, "unreadCount": unread_count(user.family_id)}
 
 
 @router.get("/habits")
@@ -650,6 +852,38 @@ async def habits(user: AuthUser = Depends(current_user)) -> dict[str, Any]:
                    for r in records],
         "count": len(records),
     }
+
+
+class ForgetRequest(BaseModel):
+    """遗忘一条记忆的请求。"""
+
+    memory_key: str = Field(..., description="要忘掉的记忆 key（如 preference:空调温度）")
+
+
+@router.post("/habits/forget")
+async def forget_habit(
+    req: ForgetRequest, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
+    """主动遗忘一条 AI 记住的习惯。
+
+    为什么接口层要有这个：习惯卡片现在是可点的，点了就得有真实结果。
+    "让 AI 忘掉"是唯一符合直觉的动作——留着"点了没反应"不如不做。
+
+    双库同清：长期记忆库 + 语义索引一起删（NFR-COMP-001），
+    只删一边会出现"习惯页看不到了，AI 对话里还记得"的撕裂。
+    """
+    service = get_memory_service()
+    ok = service.forget(user.member_id, req.memory_key, family_id=user.family_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="这条记忆不存在或不属于你")
+
+    record_event(
+        user.family_id, TYPE_SYSTEM,
+        title=f"AI 忘掉了一条习惯：{req.memory_key.replace('preference:', '')}",
+        body=f"操作人：{user.name} · 长期记忆与语义索引已同步清除",
+        actor=user.name,
+    )
+    return {"ok": True, "forgot": req.memory_key}
 
 
 def mount_web(app: Any) -> None:

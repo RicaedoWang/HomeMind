@@ -369,3 +369,15 @@ def get_memory_service() -> MemoryService:
     if _service is None:
         _service = MemoryService()
     return _service
+
+
+def set_memory_service(service: MemoryService | None) -> None:
+    """替换记忆服务单例（测试专用）。
+
+    与 `auth.set_account_store` 同一个套路：单例在测试里必须能换掉，
+    否则测试只能往用户的真实记忆库 `data/homemind.db` 里写东西——
+    那条库里有真记住的偏好，测试碰它一次就是一次不可逆污染。
+    传 None 表示还原（下次 get_memory_service() 重新建）。
+    """
+    global _service
+    _service = service

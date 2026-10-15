@@ -65,6 +65,17 @@ async def login(req: LoginRequest) -> dict[str, Any]:
         city=account.city,
     )
     token, expires_in = issue_token(user)
+
+    # 登录本身就是一条真实事件：刚进家门时消息中心不该是空的。
+    # 早期的种子消息是编的，现在第一条是真的——"谁在几点进了哪个家"。
+    from .events import TYPE_SYSTEM, record_event
+
+    record_event(
+        user.family_id, TYPE_SYSTEM,
+        title=f"{user.name} 登录了控制台",
+        body=f"身份：{user.role} · 城市：{user.city} · 家庭：{user.family_id}",
+        actor=user.name,
+    )
     return {
         "token": token,
         "tokenType": "Bearer",

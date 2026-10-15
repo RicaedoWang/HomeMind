@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from ..core.tenancy import DEFAULT_FAMILY_ID, FAMILY_ARG
 from ..core.trace import get_logger
 from .registry import ToolSpec
 
@@ -44,6 +45,7 @@ async def _handle_create_reminder(args: dict[str, Any]) -> dict[str, Any]:
     """
     content: str = args.get("content", "").strip()
     scheduled_at: str | None = args.get("scheduled_at")
+    family_id: str = args.get(FAMILY_ARG) or DEFAULT_FAMILY_ID
 
     if not content:
         return {"success": False, "message": "提醒内容不能为空"}
@@ -67,14 +69,17 @@ async def _handle_create_reminder(args: dict[str, Any]) -> dict[str, Any]:
         }
 
     # 重复检测：同内容同时间视为重复，直接返回已有条目（幂等的业务层保险）
+    # 只在**本家庭内**比对——两家的"晚上九点关灯"是两条各自独立的提醒。
     for item in _SCHEDULES:
-        if item["content"] == content and item["scheduled_at"] == scheduled_at:
+        if (item["content"] == content and item["scheduled_at"] == scheduled_at
+                and item["family_id"] == family_id):
             logger.info("duplicate schedule detected: %s", content)
             return {"success": True, "message": "该提醒已存在，未重复创建",
                     "schedule": item, "duplicate": True}
 
     schedule = {
         "schedule_id": _next_id(),
+        "family_id": family_id,
         "content": content,
         "scheduled_at": parsed.isoformat(),
         "created_at": datetime.now().isoformat(timespec="seconds"),
@@ -87,9 +92,10 @@ async def _handle_create_reminder(args: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _handle_list_schedule(args: dict[str, Any]) -> dict[str, Any]:
-    """查询日程列表。"""
+    """查询本家庭的日程列表（别的家庭查不到）。"""
     keyword: str | None = args.get("keyword")
-    items = _SCHEDULES
+    family_id: str = args.get(FAMILY_ARG) or DEFAULT_FAMILY_ID
+    items = [s for s in _SCHEDULES if s["family_id"] == family_id]
     if keyword:
         items = [s for s in items if keyword in s["content"]]
     return {"success": True, "schedules": items, "count": len(items)}
@@ -128,12 +134,28 @@ def build_calendar_tools() -> list[ToolSpec]:
     ]
 
 
-def reset_schedules() -> None:
-    """清空日程（测试用）。"""
-    _SCHEDULES.clear()
-    _SEQ["value"] = 0
+def get_schedules(family_id: str | None = None) -> list[dict[str, Any]]:
+    """获取某个家庭的日程列表（演示界面 / 控制台用）。
+
+    注意此前这个文件里 `reset_schedules` 被定义了两次，
+    第二个把第一个整个覆盖掉——和 device_server 的 reset_devices 同一个毛病，
+    已经删掉重复的那个，只剩文件开头这一份。
+    """
+    if family_id is None:
+        return _SCHEDULES
+    return [s for s in _SCHEDULES if s["family_id"] == family_id]
 
 
-def get_schedules() -> list[dict[str, Any]]:
-    """获取日程列表（演示界面用）。"""
-    return _SCHEDULES
+def delete_schedule(family_id: str, schedule_id: str) -> dict[str, Any] | None:
+    """物理删除一条日程，只删本家庭的。
+
+    为什么要有这个：AI 能创建提醒，用户就必须能删掉它。
+    只能"加"不能"删"的界面，跟"只能看不能点"一样别扭——
+    而且提醒会一直挂在今日任务框里，删不掉就是永久污染。
+
+    返回被删的那条（调用方要拿它写事件日志），找不到返回 None。
+    """
+    for i, item in enumerate(_SCHEDULES):
+        if item["schedule_id"] == schedule_id and item["family_id"] == family_id:
+            return _SCHEDULES.pop(i)
+    return None
