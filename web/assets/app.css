@@ -791,8 +791,53 @@ ul { margin: 0; padding: 0; list-style: none; }
 .hm-msgitem {
   display: flex; gap: var(--hm-space-3); padding: var(--hm-space-3) 0;
   border-bottom: 1px solid var(--hm-border-subtle);
+  cursor: pointer;                 /* 能点就得看起来能点 */
+  transition: background var(--hm-dur-fast) var(--hm-ease);
 }
 .hm-msgitem:last-child { border-bottom: none; }
+.hm-msgitem:hover { background: var(--hm-bg-sunken); }
+.hm-msgitem:active { background: var(--hm-color-brand-soft); }
+.hm-msgitem.is-unread .hm-msgitem__title { color: var(--hm-text-primary); }
+.hm-msgitem:not(.is-unread) .hm-msgitem__title { color: var(--hm-text-secondary); }
+.hm-member[data-member] { cursor: pointer; transition: background var(--hm-dur-fast) var(--hm-ease); }
+.hm-member[data-member]:hover { background: var(--hm-bg-sunken); }
+
+/* 摘要条：两块都能点 */
+.hm-summary__btn {
+  display: flex; align-items: center; gap: 6px; cursor: pointer;
+  padding: 2px 6px; margin: -2px -6px; border-radius: var(--hm-radius-xs);
+  transition: background var(--hm-dur-fast) var(--hm-ease);
+}
+.hm-summary__btn:hover { background: var(--hm-bg-sunken); }
+.hm-summary__hint { font-size: var(--hm-fs-xs); color: var(--hm-text-tertiary); }
+
+/* 通用「可点」态：统计行、房间标题、任务行。
+   同一条原则——渲染出来能点的，就必须有 hover/active 反馈，
+   否则用户分不清哪些是数据、哪些是按钮。 */
+.hm-kv.is-clickable,
+.hm-listitem.is-clickable,
+.hm-room-title.is-clickable {
+  cursor: pointer;
+  border-radius: var(--hm-radius-xs);
+  transition: background var(--hm-dur-fast) var(--hm-ease);
+}
+.hm-kv.is-clickable:hover,
+.hm-listitem.is-clickable:hover,
+.hm-room-title.is-clickable:hover { background: var(--hm-bg-sunken); }
+.hm-kv.is-clickable:active,
+.hm-listitem.is-clickable:active { background: var(--hm-color-brand-soft); }
+.hm-kv.is-clickable { padding-left: 6px; padding-right: 6px; margin-left: -6px; margin-right: -6px; }
+.hm-kv.is-clickable.is-selected { background: var(--hm-color-brand-soft); }
+.hm-kv.is-clickable.is-selected b { color: var(--hm-color-brand); }
+
+/* 任务页的筛选条 */
+.hm-filterbar {
+  display: flex; align-items: center; gap: var(--hm-space-2);
+  padding: var(--hm-space-2) var(--hm-space-3); margin-bottom: var(--hm-space-2);
+  border-radius: var(--hm-radius-md); background: var(--hm-color-brand-soft);
+  color: var(--hm-text-secondary); font-size: var(--hm-fs-xs); cursor: pointer;
+}
+.hm-filterbar span { flex: 1; }
 .hm-msgitem__icon {
   width: 32px; height: 32px; flex: none; border-radius: var(--hm-radius-xs);
   display: grid; place-items: center; background: var(--hm-bg-sunken);

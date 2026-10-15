@@ -25,14 +25,35 @@
 
   const DEVICE_ICON = { light: 'i-light', ac: 'i-ac', curtain: 'i-curtain', lock: 'i-lock',
     washer: 'i-washer', robot: 'i-robot', dryer: 'i-laundry', humidifier: 'i-humidifier',
-    valve: 'i-valve' };
+    valve: 'i-valve',
+    // 青岛家的设备（地暖/新风/油烟机）也得有图标，不然卡片上是空的
+    heater: 'i-thermo', fan: 'i-drop', hood: 'i-washer' };
   const CATEGORY_ICON = { plant: 'i-plant', laundry: 'i-laundry', pet: 'i-pet',
-    security: 'i-security', cleaning: 'i-robot', maintenance: 'i-security', other: 'i-task' };
-  const SCENE_ICON = { home: 'i-home', away: 'i-exit', movie: 'i-movie', sleep: 'i-moon', wake: 'i-sun' };
-  const SRC_TEXT = { automation: '自动化', 'device-event': '设备触发', manual: '手动', ai: 'AI 建议' };
+    security: 'i-security', cleaning: 'i-robot', maintenance: 'i-security', other: 'i-task',
+    reminder: 'i-bell' };   // AI 创建的提醒
+  const SCENE_ICON = { home: 'i-home', away: 'i-exit', movie: 'i-movie', sleep: 'i-moon',
+    wake: 'i-sun', vent: 'i-drop' };
+  const SRC_TEXT = { automation: '自动化', 'device-event': '设备触发', manual: '手动',
+    ai: 'AI 创建' };
 
   function icon(id, cls = 'hm-ico') {
     return `<svg class="${cls}" aria-hidden="true"><use href="#${id}"/></svg>`;
+  }
+
+  // 消息中心以前的时间是写死的"12 分钟前""1 小时前"——现在消息是真的，
+  // 时间也必须从事件的真实时间戳算出来，否则又是一处假数据。
+  function relTime(iso) {
+    if (!iso) return '';
+    const t = new Date(iso);
+    if (Number.isNaN(t.getTime())) return iso;
+    const diff = (Date.now() - t.getTime()) / 1000;
+    if (diff < 60) return '刚刚';
+    if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;
+    if (diff < 172800) {
+      return `昨天 ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+    }
+    return `${t.getMonth() + 1}月${t.getDate()}日`;
   }
   function hexA(hex, alpha) {
     const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
@@ -74,13 +95,14 @@
   function setToken(t) { try { localStorage.setItem(TOKEN_KEY, t); } catch { /* 隐私模式忽略 */ } }
   function clearToken() { try { localStorage.removeItem(TOKEN_KEY); } catch { /* 同上 */ } }
 
-  async function api(path, body) {
+  async function api(path, body, method) {
     const headers = { 'Content-Type': 'application/json' };
     const token = getToken();
     if (token) headers.Authorization = `Bearer ${token}`;
+    const verb = method || (body ? 'POST' : 'GET');
     const options = body
-      ? { method: 'POST', headers, body: JSON.stringify(body) }
-      : { method: 'GET', headers };
+      ? { method: verb, headers, body: JSON.stringify(body) }
+      : { method: verb, headers };
     const res = await fetch(path, options);
     if (res.status === 401) { clearToken(); showLogin('登录态失效，请重新登录'); throw new Error('unauthorized'); }
     if (!res.ok) throw new Error(`${res.status} ${path}`);
@@ -147,6 +169,7 @@
     page: 'home',
     hubCollapsed: false,
     activeScene: null,
+    taskFilter: null,    // 只看某个成员的任务（null = 看全部）
     lastConfirm: null,   // 待确认的高危动作（AI 侧）
   };
 
@@ -419,24 +442,31 @@
   }
 
   async function completeTask(id) {
+    // 首页有卡片（走动画），任务页没有卡片（只走接口）。
+    // 以前这里写死"找不到卡片就 return"，导致从任务页点完成**永远没反应**——
+    // 一个只在首页存在的 DOM 依赖，不该决定任务能不能完成。
     const card = $(`.hm-taskcard[data-id="${id}"]`);
-    if (!card || card.classList.contains('is-completing')) return;
-    card.classList.add('is-completing', 'is-done');
-    burstBubbles(card);
+    if (card) {
+      if (card.classList.contains('is-completing')) return;
+      card.classList.add('is-completing', 'is-done');
+      burstBubbles(card);
+    }
 
     const title = store.data.tasks.find((t) => t.id === id)?.title || '任务';
     try {
       const res = await api(`/api/console/tasks/${id}/complete`, { member_id: 'member_001' });
       const linked = (res.linked || []).filter((l) => l.ok).map((l) => l.name);
-      setTimeout(() => {
-        flip($('#taskhub-list'), () => card.remove());
-        renderTaskHubCounters();
-      }, 420);
+      if (card) {
+        setTimeout(() => {
+          flip($('#taskhub-list'), () => card.remove());
+          renderTaskHubCounters();
+        }, 420);
+      }
       showToast(`已完成「${title}」${linked.length ? ` · 已联动${linked.join('、')}` : ''}`,
         () => undoTask(id, 'reopen', `已撤销「${title}」`));
       await refresh();
     } catch (err) {
-      card.classList.remove('is-completing', 'is-done');
+      if (card) card.classList.remove('is-completing', 'is-done');
       showToast('网络异常，任务没改成，再点一次试试');
     }
   }
@@ -457,6 +487,47 @@
           await refresh();
         } catch {
           showToast('取消失败，请重试');
+        }
+      },
+    });
+  }
+
+  /** 让 AI 忘掉一条习惯：长期记忆 + 语义索引双库同清（后端保证）。 */
+  function askForgetHabit(key) {
+    const label = key.replace(/^preference[:：]/, '');
+    openModal({
+      title: '让 AI 忘掉这条？',
+      desc: `「${label}」会从长期记忆与语义索引里一起删掉。此后 AI 不再按它行事，除非你重新告诉它。`,
+      tone: 'warning',
+      okText: '忘掉它',
+      onOk: async () => {
+        try {
+          await api('/api/console/habits/forget', { memory_key: key });
+          showToast(`AI 已忘掉「${label}」`);
+          await refresh();
+        } catch {
+          showToast('遗忘失败，请重试');
+        }
+      },
+    });
+  }
+
+  /** 删除一条 AI 创建的提醒。高危操作走确认弹层——删了就找不回来。 */
+  function askDeleteSchedule(id) {
+    const s = (store.data.schedules || []).find((x) => x.schedule_id === id);
+    if (!s) return;
+    openModal({
+      title: '删除这条提醒？',
+      desc: `「${s.content}」（${fmtScheduleTime(s.scheduled_at)}）将从今日任务和提醒清单里移除，不可恢复。`,
+      tone: 'danger',
+      okText: '删除提醒',
+      onOk: async () => {
+        try {
+          await api(`/api/console/schedules/${id}`, null, 'DELETE');
+          showToast(`已删除提醒「${s.content}」`);
+          await refresh();
+        } catch {
+          showToast('删除失败，请重试');
         }
       },
     });
@@ -549,9 +620,21 @@
       section.className = 'hm-section';
       const onCount = devices.filter((d) => d.power).length;
       section.innerHTML = `
-        <div class="hm-room-title">${esc(room)} <span>${onCount} / ${devices.length} 开启</span></div>
+        <div class="hm-room-title is-clickable" data-room="${esc(room)}" role="button" tabindex="0"
+             title="点击一键${onCount ? '关闭' : '打开'}本房间设备">${esc(room)}
+          <span>${onCount} / ${devices.length} 开启</span></div>
         <div class="hm-devicegrid"></div>`;
       const grid = $('.hm-devicegrid', section);
+
+      // 房间标题显示着"几台开着"，看着就该能点。点了 = 整屋一键开关。
+      const roomBar = $('[data-room]', section);
+      if (roomBar) {
+        const fire = () => toggleRoom(room);
+        roomBar.addEventListener('click', fire);
+        roomBar.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fire(); }
+        });
+      }
 
       devices.forEach((d) => {
         const card = document.createElement('article');
@@ -559,6 +642,13 @@
           + (d.online === false ? ' is-offline' : '') + (d.alert ? ' has-alert' : '');
         card.dataset.id = d.id;
         card.innerHTML = deviceCardHtml(d);
+
+        // 整张卡都能点：手机上没人会去瞄右上角那个小开关。
+        // 开关和滑杆自己有处理逻辑，点它们不算点卡片。
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('.hm-switch, .hm-slider')) return;
+          toggleDevice(d);
+        });
 
         const sw = $('.hm-switch', card);
         sw.addEventListener('click', (e) => {
@@ -597,6 +687,34 @@
     await controlDevice(d.id, d.power ? 'turn_off' : 'turn_on');
   }
 
+  /** 房间标题「N / M 开启」→ 整屋一键开关。
+   *
+   * 高危设备（门锁）不进批量：整屋一键把门开了，这种自动化没人敢用。
+   * 它们跳过并在提示里说清楚，用户想开还得自己到卡片上确认一次。
+   */
+  async function toggleRoom(room) {
+    const inRoom = store.data.devices.filter((d) => d.room === room && d.online !== false);
+    const risky = inRoom.filter((d) => d.highRisk);
+    const plain = inRoom.filter((d) => !d.highRisk);
+    if (!plain.length) {
+      showToast(`「${room}」只有门锁这类高危设备，请在卡片上单独确认`);
+      return;
+    }
+    const anyOn = plain.some((d) => d.power);
+    const action = anyOn ? 'turn_off' : 'turn_on';
+    let ok = 0;
+    for (const d of plain) {
+      try {
+        const res = await api(`/api/console/devices/${d.id}/control`,
+          { action, member_id: 'member_001' });
+        if (res.ok) ok += 1;
+      } catch { /* 单台失败不中断整屋，最后按成功台数汇报 */ }
+    }
+    const skip = risky.length ? ` · 已跳过 ${risky.map((d) => d.name).join('、')}（需单独确认）` : '';
+    showToast(`已${anyOn ? '关闭' : '打开'}「${room}」${ok} 台设备${skip}`);
+    await refresh();
+  }
+
   async function controlDevice(id, action, value = null, confirmed = false) {
     const card = $(`.hm-devicecard[data-id="${id}"]`);
     const sw = card && $('.hm-switch', card);
@@ -629,50 +747,167 @@
     const { energy, messages } = store.data;
     const unread = messages.filter((m) => m.unread).length;
     const down = energy.delta < 0;
+    // 用电这块点了要真切换（今日 → 本周 → 本月），不能是个只会亮着的数字
+    const views = [{ key: 'today', label: '今日用电' }, { key: 'week', label: '本周用电' },
+      { key: 'month', label: '本月用电' }];
+    const view = views[(store.energyView || 0) % views.length];
     $('#summary').innerHTML = `
-      <div>${icon('i-bolt', 'hm-ico hm-ico--sm')} 今日用电 <b>${energy.today} ${energy.unit}</b>
-        · 较昨日 <span class="${down ? 'is-down' : ''}">${down ? '↓' : '↑'}${Math.abs(energy.delta)}%</span></div>
-      <div style="display:flex;align-items:center;gap:6px">
+      <div data-energy-view role="button" tabindex="0" class="hm-summary__btn"
+           title="点击切换 今日 / 本周 / 本月">
+        ${icon('i-bolt', 'hm-ico hm-ico--sm')} ${view.label}
+        <b>${energy[view.key]} ${energy.unit}</b>
+        ${view.key === 'today'
+          ? `· 较昨日 <span class="${down ? 'is-down' : ''}">${down ? '↓' : '↑'}${Math.abs(energy.delta)}%</span>`
+          : ''}
+      </div>
+      <div data-goto-messages role="button" tabindex="0" class="hm-summary__btn"
+           title="点击查看消息">
         ${icon('i-bell', 'hm-ico hm-ico--sm')}
         ${unread ? `<b>${unread} 条新消息</b>` : '暂无新消息'}
+        ${unread ? '<span class="hm-summary__hint">点击标记全部已读</span>' : ''}
       </div>`;
+
+    const ev = $('[data-energy-view]', $('#summary'));
+    if (ev) {
+      const flip = () => {
+        store.energyView = ((store.energyView || 0) + 1) % views.length;
+        renderSummary();
+      };
+      ev.addEventListener('click', flip);
+      ev.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); }
+      });
+    }
+
+    const gm = $('[data-goto-messages]', $('#summary'));
+    if (gm) {
+      const jump = () => {
+        const target = $('#aside-messages');
+        if (target && target.offsetParent !== null) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          markAllMessagesRead();   // 窄屏看不到右栏，就当"一键已读"用
+        }
+      };
+      gm.addEventListener('click', jump);
+      gm.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jump(); }
+      });
+    }
+  }
+
+  async function markAllMessagesRead() {
+    try {
+      const res = await api('/api/console/messages/read-all', {});
+      (store.data.messages || []).forEach((m) => { m.unread = false; });
+      renderAside(); renderSummary();
+      if (res.marked) showToast(`已把 ${res.marked} 条消息标为已读`);
+    } catch {
+      showToast('标记已读失败，请重试');
+    }
+  }
+
+  // 点家庭成员 → 只看 TA 的任务；再点同一个人 / 点"清除筛选" → 恢复全部
+  function filterTasksByMember(memberId) {
+    store.taskFilter = (memberId && store.taskFilter === memberId) ? null : memberId;
+    go('tasks');
+    renderPages();
+  }
+
+  async function markMessageRead(id) {
+    const m = (store.data.messages || []).find((x) => x.id === id);
+    if (!m || !m.unread) return;
+    m.unread = false;          // 先本地乐观更新：点了立刻有反馈，不等网络
+    renderAside(); renderSummary();
+    try {
+      await api(`/api/console/messages/${id}/read`, {});
+    } catch {
+      m.unread = true;         // 失败了就回滚，不能假装已读
+      renderAside(); renderSummary();
+    }
   }
 
   function renderAside() {
     const { energy, messages, family } = store.data;
     $('#aside-energy').innerHTML = `
       <div class="hm-card">
-        <div class="hm-card__title">用电趋势（近 7 天）</div>
+        <div class="hm-card__title">用电趋势（近 7 天）· 点击切换摘要</div>
         <div class="hm-spark">${[3.1, 3.6, 2.9, 4.2, 3.4, 3.0, energy.today]
           .map((v) => `<span style="height:${Math.round((v / 4.5) * 100)}%"></span>`).join('')}</div>
-        <div class="hm-kv"><span>今日</span><b>${energy.today} kWh</b></div>
-        <div class="hm-kv"><span>本周</span><b>${energy.week} kWh</b></div>
-        <div class="hm-kv"><span>本月</span><b>${energy.month} kWh</b></div>
+        ${[{ k: 'today', label: '今日' }, { k: 'week', label: '本周' }, { k: 'month', label: '本月' }]
+          .map((row, i) => `<div class="hm-kv is-clickable${(store.energyView || 0) === i ? ' is-selected' : ''}"
+            data-energy-jump="${i}" role="button" tabindex="0" title="在摘要条里看${row.label}用电">
+            <span>${row.label}</span><b>${energy[row.k]} kWh</b></div>`).join('')}
       </div>`;
 
-    const msgIcon = { device: 'i-washer', security: 'i-lock', system: 'i-bell' };
-    $('#aside-messages').innerHTML = `<div class="hm-card"><div class="hm-msgitems">
-      ${messages.map((m) => `
-        <div class="hm-msgitem">
+    // 右栏这三个数字点了要真切换摘要条，不是摆着好看的统计
+    $$('[data-energy-jump]', $('#aside-energy')).forEach((el) => {
+      const fire = () => {
+        store.energyView = Number(el.dataset.energyJump);
+        renderSummary();
+        renderAside();
+        const target = $('#summary');
+        if (target) target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
+      };
+      el.addEventListener('click', fire);
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fire(); }
+      });
+    });
+
+    // 消息图标按真实事件类型选：设备 / 场景 / 任务 / 安全 / 系统(AI 提醒)
+    const msgIcon = { device: 'i-light', scene: 'i-scene', task: 'i-check',
+      security: 'i-lock', system: 'i-sparkle' };
+    const unreadN = messages.filter((m) => m.unread).length;
+    $('#aside-messages').innerHTML = `<div class="hm-card">
+      <div class="hm-card__title">家庭消息${unreadN ? ` · ${unreadN} 条未读` : ''}</div>
+      <div class="hm-msgitems">
+      ${messages.length ? messages.map((m) => `
+        <div class="hm-msgitem${m.unread ? ' is-unread' : ''}" data-msg="${esc(m.id)}"
+             role="button" tabindex="0" title="${m.unread ? '点击标为已读' : '已读'}">
           <span class="hm-msgitem__icon">${icon(msgIcon[m.type] || 'i-bell', 'hm-ico hm-ico--sm')}</span>
           <div class="hm-msgitem__body">
             <div class="hm-msgitem__title">${esc(m.title)}${m.unread ? '<i class="hm-dot-unread"></i>' : ''}</div>
-            <div class="hm-msgitem__desc">${esc(m.body)}</div>
+            <div class="hm-msgitem__desc">${esc(m.body || '')}</div>
           </div>
-          <span class="hm-msgitem__time">${esc(m.time)}</span>
-        </div>`).join('')}
+          <span class="hm-msgitem__time">${relTime(m.time)}</span>
+        </div>`).join('')
+        : `<div class="hm-empty">还没有消息。开关设备、执行场景、完成任务，
+           或让 AI 帮你加个提醒——每一次真实操作都会在这里留下记录。</div>`}
     </div></div>`;
 
+    // 消息条目必须能点：点了标为已读。
+    // 渲染出来却点不出任何反应的元素，比不做这个元素更让人恼火。
+    $$('[data-msg]', $('#aside-messages')).forEach((el) => {
+      const fire = () => markMessageRead(el.dataset.msg);
+      el.addEventListener('click', fire);
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fire(); }
+      });
+    });
+
     $('#aside-family').innerHTML = `<div class="hm-card">
+      <div class="hm-card__title">家庭成员 · 点击查看 TA 的任务</div>
       ${family.map((m) => `
-        <div class="hm-member" style="padding:6px 0">
+        <div class="hm-member" style="padding:6px 0" data-member="${esc(m.id)}"
+             role="button" tabindex="0">
           <span class="hm-avatar" style="background:${m.colorTag}">${esc(m.avatar)}</span>
           <div class="hm-listitem__body">
             <div class="hm-listitem__title">${esc(m.name)}</div>
             <div class="hm-listitem__desc">${esc({ owner: '管理员', admin: '共同管理', member: '成员' }[m.role] || m.role)}</div>
           </div>
+          ${icon('i-chevron-right', 'hm-ico hm-ico--sm')}
         </div>`).join('')}
     </div>`;
+
+    // 点成员 = 筛选"指派给 TA 的任务"，不是摆着看的头像
+    $$('[data-member]', $('#aside-family')).forEach((el) => {
+      const fire = () => filterTasksByMember(el.dataset.member);
+      el.addEventListener('click', fire);
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fire(); }
+      });
+    });
 
     renderHabitsInto($('#aside-habits'));
   }
@@ -688,9 +923,21 @@
         return;
       }
       host.innerHTML = `<div class="hm-card">
-        ${res.habits.map((h) => `<div class="hm-kv"><span>${esc(h.key.replace(/^preference[:：]/, ''))}</span>
-          <b>${esc(h.value)}</b></div>`).join('')}
+        <div class="hm-card__title">AI 记住的习惯 · 点击可让 AI 忘掉</div>
+        ${res.habits.map((h) => `<div class="hm-kv is-clickable" data-habit="${esc(h.key)}"
+            role="button" tabindex="0" title="点击让 AI 忘掉这条">
+            <span>${esc(h.key.replace(/^preference[:：]/, ''))}</span>
+            <b>${esc(h.value)}</b></div>`).join('')}
       </div>`;
+
+      // 记忆能存就得能删，否则"记住了错的偏好"这件事永远改不回来
+      $$('[data-habit]', host).forEach((el) => {
+        const fire = () => askForgetHabit(el.dataset.habit);
+        el.addEventListener('click', fire);
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fire(); }
+        });
+      });
     } catch {
       host.innerHTML = '<div class="hm-card"><div class="hm-card__title">习惯读取失败</div></div>';
     }
@@ -699,13 +946,30 @@
   function renderPages() {
     if (!store.data) return;   // 没登录时不渲染，别拿 null 去取 tasks
     // 任务页：全部任务（含已完成 / 已取消），可恢复
+    // 任务页支持"看某个人的任务"（从家庭成员卡片点进来）
     const all = store.data.tasks;
-    $('#tasks-sub').textContent = `${all.filter((t) => t.status === 'pending').length} 项待办 · ${all.length} 条记录`;
-    $('#page-tasks-list').innerHTML = all.length ? all.map((t) => {
+    const filter = store.taskFilter;
+    const shown = filter
+      ? all.filter((t) => (t.assigneeIds || []).includes(filter))
+      : all;
+    const filterName = filter
+      ? (store.data.family || []).find((m) => m.id === filter)
+      : null;
+    $('#tasks-sub').textContent = filter && filterName
+      ? `只看「${filterName.name}」· ${shown.filter((t) => t.status === 'pending').length} 项待办`
+      : `${all.filter((t) => t.status === 'pending').length} 项待办 · ${all.length} 条记录`;
+    const filterBar = filter ? `
+      <div class="hm-filterbar" data-clear-filter>
+        ${icon('i-user', 'hm-ico hm-ico--sm')}
+        <span>只看「${esc(filterName ? filterName.name : filter)}」的任务</span>
+        <button class="hm-btn hm-btn--ghost" style="height:32px;padding:0 10px">清除筛选</button>
+      </div>` : '';
+    $('#page-tasks-list').innerHTML = filterBar + (shown.length ? shown.map((t) => {
       const statePill = t.status === 'done' ? '<span class="hm-state-pill is-done">已完成</span>'
         : t.status === 'cancelled' ? '<span class="hm-state-pill is-cancelled">已取消</span>' : '';
       return `
-      <div class="hm-listitem" data-id="${t.id}">
+      <div class="hm-listitem is-clickable" data-id="${t.id}" role="button" tabindex="0"
+           title="${t.status === 'pending' ? '点击标记完成' : '点击恢复为待办'}">
         <div class="hm-taskcard__icon" style="background:${hexA(t.colorTag, 0.16)};color:${t.colorTag}">
           ${icon(CATEGORY_ICON[t.category] || 'i-task')}
         </div>
@@ -718,11 +982,32 @@
           ? `<button class="hm-btn hm-btn--ghost" style="flex:none;height:36px;padding:0 12px"
                data-undo="${t.id}">恢复</button>` : ''}
       </div>`;
-    }).join('') : '<div class="hm-empty">还没有任务</div>';
+    }).join('') : '<div class="hm-empty">还没有任务</div>');
 
     $$('[data-undo]', $('#page-tasks-list')).forEach((b) => {
-      b.addEventListener('click', () => undoTask(b.dataset.undo, 'reopen', '已恢复为待办'));
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();     // 别让行级的"点击恢复"再触发一次
+        undoTask(b.dataset.undo, 'reopen', '已恢复为待办');
+      });
     });
+
+    // 任务行本身可点：待办 → 标记完成；已完成 / 已取消 → 恢复。
+    // 行上那个"恢复"按钮自己已处理，点它不算点行（上面 stopPropagation）。
+    $$('[data-id]', $('#page-tasks-list')).forEach((row) => {
+      const fire = () => {
+        const t = store.data.tasks.find((x) => x.id === row.dataset.id);
+        if (!t) return;
+        if (t.status === 'pending') completeTask(t.id);
+        else undoTask(t.id, 'reopen', `已恢复「${t.title}」`);
+      };
+      row.addEventListener('click', fire);
+      row.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fire(); }
+      });
+    });
+
+    const clearBar = $('[data-clear-filter]', $('#page-tasks-list'));
+    if (clearBar) clearBar.addEventListener('click', () => filterTasksByMember(null));
 
     // 场景页
     $('#page-scenes-list').innerHTML = store.data.scenes.map((s) => `
@@ -763,20 +1048,24 @@
         </div>
       </div>
       <div class="hm-card">
-        <div class="hm-card__title">家庭成员</div>
+        <div class="hm-card__title">家庭成员 · 点击查看 TA 的任务</div>
         ${store.data.family.map((m) => `
-          <div class="hm-member" style="padding:6px 0">
+          <div class="hm-member" style="padding:6px 0" data-member="${esc(m.id)}"
+               role="button" tabindex="0">
             <span class="hm-avatar" style="background:${m.colorTag}">${esc(m.avatar)}</span>
             <div class="hm-listitem__body">
               <div class="hm-listitem__title">${esc(m.name)}</div>
               <div class="hm-listitem__desc">${esc({ owner: '管理员', admin: '共同管理', member: '成员' }[m.role] || m.role)}</div>
             </div>
+            ${icon('i-chevron-right', 'hm-ico hm-ico--sm')}
           </div>`).join('')}
       </div>
       <div class="hm-card">
-        <div class="hm-card__title">已设提醒（${schedules.length}）</div>
+        <div class="hm-card__title">已设提醒（${schedules.length}）· 点击可删除</div>
         ${schedules.length
-          ? schedules.map((s) => `<div class="hm-kv"><span>${esc(s.content || '提醒')}</span>
+          ? schedules.map((s) => `<div class="hm-kv is-clickable" data-schedule="${esc(s.schedule_id)}"
+              role="button" tabindex="0" title="点击删除这条提醒">
+              <span>${esc(s.content || '提醒')}</span>
               <b>${esc(fmtScheduleTime(s.scheduled_at))}</b></div>`).join('')
           : '<div style="font-size:13px;color:var(--hm-text-tertiary)">还没有提醒，跟 AI 说「明天 7 点叫我起床」即可创建。</div>'}
       </div>
@@ -798,6 +1087,24 @@
         try { localStorage.setItem('hm-theme', b.dataset.theme); } catch { /* 忽略隐私模式 */ }
       });
     });
+    // 「我的」页的家庭成员与右栏一致：点了就去任务页看这个人被指派了什么
+    $$('#page-me-body [data-member]').forEach((el) => {
+      const fire = () => filterTasksByMember(el.dataset.member);
+      el.addEventListener('click', fire);
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fire(); }
+      });
+    });
+
+    // 提醒能加也要能删：AI 建的提醒挂在今日任务框里，删不掉就是永久污染
+    $$('#page-me-body [data-schedule]').forEach((el) => {
+      const fire = () => askDeleteSchedule(el.dataset.schedule);
+      el.addEventListener('click', fire);
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fire(); }
+      });
+    });
+
     const saved = (() => { try { return localStorage.getItem('hm-theme'); } catch { return null; } })();
     if (saved && saved !== 'dark') $('#page-me-body [data-theme="light"]')?.click();
 
