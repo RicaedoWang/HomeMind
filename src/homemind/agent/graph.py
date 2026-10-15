@@ -339,6 +339,20 @@ async def respond_node(state: AgentState, service: MemoryService) -> dict[str, A
             )
             return {"final_answer": f"你让我记住的习惯共 {len(records)} 条：\n{lines}"}
 
+        # 记忆写入：用户说"我习惯…""我喜欢…"这类陈述，必须明确告诉他记住了什么。
+        # 曾经这里没处理 memory_write，用户刚说完习惯，回的却是闲聊模板
+        # "我在听。可以说「我喜欢…」" —— 他刚说完，你让他再说一遍？
+        # 用 extract_memories 预览（它和 write_memory_node 用同一个抽取器），
+        # 所以应答里说的"记住了 X"和实际入库的内容**必然一致**，不会撒谎。
+        if any(i.get("type") == IntentType.MEMORY_WRITE.value
+               for i in state.get("intents", [])):
+            extracted = service.extract_memories(state["user_input"])
+            if extracted:
+                items = "；".join(value for _, _, value in extracted)
+                return {"final_answer": f"记住了：{items}。之后我会照着做。"}
+            return {"final_answer":
+                    "这句我没听出要记的习惯。可以说「我习惯…」「我喜欢…」，我来记。"}
+
         parts: list[str] = []
         for item in state.get("tool_results", []):
             if item.get("ok"):

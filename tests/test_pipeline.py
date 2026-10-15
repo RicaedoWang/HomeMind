@@ -158,3 +158,24 @@ async def test_missing_time_triggers_clarify(graph):
     result = await _run(graph, "提醒我交房租")
     assert result["requires_confirm"] is True
     assert len(get_schedules()) == 0
+
+
+async def test_add_task_via_chat_creates_reminder(graph):
+    """『新加今日任务，晚上八点喂猫』必须创建提醒，不能被当成闲聊。
+
+    用户实测抓出来的 bug：这句话被判成 chat，AI 回了句"我在听"——
+    任务没建、设备没动、界面没反应，三种沉默里最气人的一种。
+    根因是"加任务"这句创建表达不在日程词表里。
+    """
+    result = await _run(graph, "新加今日任务，晚上八点喂猫")
+    assert result["requires_confirm"] is True, \
+        f"意图: {[i['type'] for i in result['intents']]}"
+    assert len(get_schedules()) == 0  # 未确认不落库
+
+    confirmed = await _run(graph, "新加今日任务，晚上八点喂猫", confirmed=True)
+    assert len(get_schedules()) == 1
+    schedule = get_schedules()[0]
+    # "新加今日任务"这种操作残留不能混进提醒标题
+    assert schedule["content"] == "晚上八点喂猫"
+    assert schedule["scheduled_at"].endswith("T20:00:00")
+    assert "已创建提醒" in confirmed["final_answer"]

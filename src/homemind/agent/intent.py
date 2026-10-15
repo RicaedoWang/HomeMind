@@ -38,6 +38,12 @@ QUERY_WORDS = ("状态", "开着吗", "关了吗", "多少度", "查询", "看�
 
 SCHEDULE_WORDS = ("提醒", "记得", "日程", "安排", "闹钟", "提示我", "别忘了",
                   "叫我", "叫醒", "到点")
+
+# 任务创建表达："新加今日任务，晚上八点喂猫""加个任务：明天买猫粮"。
+# 刻意**不**把裸的"任务"塞进 SCHEDULE_WORDS——"看看今天的任务""任务进度如何"
+# 这类查询句会被误伤成"创建日程"。只匹配"动词 + 任务"的创建句式。
+TASK_ADD_PATTERN = re.compile(
+    r"(新加|添加|新增|创建|新建|记个|加个|加一下|帮我加)[^，。；！？]{0,10}(任务|待办|事项)")
 KNOWLEDGE_WORDS = ("怎么", "如何", "为什么", "什么意思", "说明书", "怎么用",
                    "多久", "几次", "清洗", "保养", "故障", "坏了")
 # 注意：不要往这里加"多少"——"空调多少度"是查设备状态，属于设备控制而非知识问答。
@@ -156,7 +162,10 @@ def _classify(text: str) -> tuple[IntentType, float]:
         w in text
         for w in ON_WORDS + OFF_WORDS + SET_WORDS + DELTA_UP + DELTA_DOWN + QUERY_WORDS
     )
-    has_schedule = any(w in text for w in SCHEDULE_WORDS)
+    # "加任务"是创建日程的另一种说法（对齐需求"给 AI 加任务要进今日任务框"），
+    # 也要压过设备判定——同"提醒我九点关灯"一个道理。
+    has_schedule = (any(w in text for w in SCHEDULE_WORDS)
+                    or bool(TASK_ADD_PATTERN.search(text)))
     has_knowledge = any(w in text for w in KNOWLEDGE_WORDS)
 
     # 提醒判定必须压过设备判定（顺序改过一次，见下）：
@@ -183,11 +192,11 @@ def _classify(text: str) -> tuple[IntentType, float]:
 
 def _extract_schedule_fields(text: str) -> dict[str, Any]:
     """抽取日程类意图的字段：内容与时间。"""
-    # 去掉触发词和礼貌词，剩下的作为提醒内容
-    content = text
+    # 先剥掉"加任务"句式，再剥触发词——否则提醒内容里会带着"新加今日任务"这种操作残留
+    content = TASK_ADD_PATTERN.sub("", text)
     for word in SCHEDULE_WORDS:
         content = content.replace(word, "")
-    content = re.sub(r"[，,。！!？?、\s]+", " ", content).strip(" 的我")
+    content = re.sub(r"[，,。！!？?、：:\s]+", " ", content).strip(" 的我")
     # 去掉时间片段，避免内容里混入时间
     parsed, confidence = parse_time_expr(text)
     fields: dict[str, Any] = {"content": content or "提醒"}

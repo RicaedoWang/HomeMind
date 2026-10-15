@@ -142,6 +142,14 @@ DATASET: list[EvalCase] = [
     _case("cal-06", "查看我的日程", "日程提醒",
           expect_intents=["schedule"],
           note="查询日程：是否执行取决于时间能否解析，只断言意图"),
+    _case("cal-07", "新加今日任务，晚上八点喂猫", "日程提醒",
+          expect_intents=["schedule"], expect_no_tool=True, expect_confirm=True,
+          note="'加任务'是创建日程的另一种说法，必须进今日任务框。"
+               "曾经被判成 chat 回了句'我在听'，任务没建界面没反应"),
+    _case("cal-08", "加个任务：明天买猫粮", "日程提醒",
+          expect_intents=["schedule"], expect_no_tool=True, expect_confirm=True,
+          note="带冒号的任务创建句式，同 cal-07。"
+               "刻意不断言裸'任务'——'看看今天的任务'这类查询句不能被误伤"),
 
     # ============ D. 知识问答 ============
     _case("knw-01", "空调滤网要多久洗一次", "知识问答",

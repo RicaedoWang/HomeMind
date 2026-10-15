@@ -119,6 +119,26 @@ async def test_memory_query_not_written_as_memory(env):
     assert result["final_answer"].find("还没记住") != -1 or "0 条" in result["final_answer"]
 
 
+async def test_memory_write_gets_acknowledged(env):
+    """说完习惯必须得到"记住了 X"的明确回执，不能回闲聊模板。
+
+    用户实测抓出来的 bug：说完"我习惯晚上十一点睡觉…"，
+    AI 回的是"我在听。可以说「我喜欢…」"——他刚说完，你让他再说一遍？
+    回执内容必须和实际入库的**完全一致**：应答里的"记住了 X"
+    和 write_memory_node 用的是同一个抽取器，不许应答撒谎。
+    """
+    graph, _ = env
+    result = await _run(graph, "我习惯空调开 24 度")
+
+    assert result["written_memories"], "记忆没写进库"
+    answer = result["final_answer"]
+    assert "记住了" in answer, f"应有明确回执，实际：{answer}"
+    assert "我在听" not in answer, "不能回闲聊模板"
+    # 回执说的和实际存的是同一句话
+    stored = result["written_memories"][0]["memory_value"]
+    assert stored in answer, f"回执（{answer}）与入库内容（{stored}）不一致"
+
+
 async def test_permission_in_full_pipeline(env):
     """家长的高权限记忆，儿童身份在完整链路里也召不到。"""
     graph, _ = env
