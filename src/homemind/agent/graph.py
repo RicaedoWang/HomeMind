@@ -19,6 +19,7 @@ from langgraph.graph import END, StateGraph
 
 from ..core.llm import get_llm_client
 from ..core.models import IntentType, TaskStatus
+from ..core.tenancy import DEFAULT_FAMILY_ID
 from ..core.trace import get_logger, span
 from ..memory.service import MemoryService, get_memory_service
 from ..tools.registry import ToolRegistry
@@ -48,6 +49,7 @@ async def recall_memory_node(state: AgentState, service: MemoryService) -> dict[
             member_id=state.get("member_id"),
             viewer_role=state.get("member_role", "L4"),
             top_k=5,
+            family_id=state.get("family_id") or DEFAULT_FAMILY_ID,
         )
         return {"recalled_memories": recalled}
 
@@ -67,6 +69,7 @@ async def write_memory_node(state: AgentState, service: MemoryService) -> dict[s
             member_id=state.get("member_id", "member_001"),
             text=state["user_input"],
             visible_role=state.get("member_role", "L3"),
+            family_id=state.get("family_id") or DEFAULT_FAMILY_ID,
         )
         return {"written_memories": written}
 
@@ -319,6 +322,7 @@ async def respond_node(state: AgentState, service: MemoryService) -> dict[str, A
             records = service.long_term.list_by_member(
                 state.get("member_id", "member_001"),
                 viewer_role=state.get("member_role", "L4"),
+                family_id=state.get("family_id") or DEFAULT_FAMILY_ID,
             )
             mem_facts = [f"记忆清单第{i}条：{r.memory_value}"
                          for i, r in enumerate(records, 1)]

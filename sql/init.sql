@@ -38,8 +38,15 @@ CREATE TABLE IF NOT EXISTS device (
 
 -- 长期结构化记忆（FR-MEM-002）
 -- memory_type: preference 偏好 / member_profile 成员画像 / device_habit 设备习惯 / scene 场景
+--
+-- 唯一键必须是 (family_id, member_id, memory_key) 三元组：
+-- 两个家庭各有一条"preference:空调温度"（深圳 26 度、青岛 20 度），
+-- key 完全一样。只按 (member_id, memory_key) 唯一，后写的会把先写的覆盖掉——
+-- 你在深圳调好的空调温度，会被小明家的设置冲掉。
+-- 这一列在 SQLite 版里靠 memory_struct_v2 迁移补上，两边结构必须一致。
 CREATE TABLE IF NOT EXISTS memory_struct (
     memory_id    BIGINT AUTO_INCREMENT PRIMARY KEY,
+    family_id    VARCHAR(36) NOT NULL DEFAULT 'family_sz',
     member_id    VARCHAR(36) NOT NULL,
     memory_type  VARCHAR(32) NOT NULL,
     memory_key   VARCHAR(128) NOT NULL,
@@ -49,6 +56,8 @@ CREATE TABLE IF NOT EXISTS memory_struct (
     visible_role VARCHAR(8) NOT NULL DEFAULT 'L3',
     created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_family_member_key (family_id, member_id, memory_key),
+    INDEX idx_family (family_id),
     INDEX idx_member_type (member_id, memory_type),
     INDEX idx_key (memory_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

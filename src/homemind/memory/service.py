@@ -29,6 +29,7 @@ import time
 from typing import Any
 
 from ..config import Settings, get_settings
+from ..core.tenancy import DEFAULT_FAMILY_ID
 from ..core.trace import get_logger, span
 from .long_term import (
     TYPE_DEVICE_HABIT,
@@ -150,6 +151,7 @@ class MemoryService:
         memory_key: str | None = None,
         importance: float = 0.6,
         visible_role: str = "L3",
+        family_id: str = DEFAULT_FAMILY_ID,
     ) -> list[dict[str, Any]]:
         """写入记忆：规则抽取 + 双写（结构化库 + 语义库）。
 
@@ -173,7 +175,7 @@ class MemoryService:
             # key 归一化只能挡住"空调温度"这类规则可归纳的，
             # "喜欢睡觉的时候把窗帘关掉" 和 "我喜欢睡觉的时候把窗帘关掉"
             # 这种表述差异要靠相似度兜底。
-            dup = self.find_duplicate(member_id, value)
+            dup = self.find_duplicate(member_id, value, family_id=family_id)
             if dup is not None:
                 existing, sim = dup
                 key = existing.memory_key
@@ -183,7 +185,7 @@ class MemoryService:
             record = self.long_term.upsert(
                 member_id=member_id, memory_type=mtype, memory_key=key,
                 memory_value=value, importance=importance,
-                visible_role=visible_role,
+                visible_role=visible_role, family_id=family_id,
             )
             # 语义库同步（双写一致性）
             self.semantic.add(
@@ -206,8 +208,15 @@ class MemoryService:
         member_id: str | None = None,
         viewer_role: str = "L4",
         top_k: int = 5,
+        family_id: str = DEFAULT_FAMILY_ID,
     ) -> list[dict[str, Any]]:
-        """记忆召回，返回按综合分排序的记忆列表。"""
+        """记忆召回，返回按综合分排序的记忆列表（只回本家庭的）。
+
+        语义层按 member_id 过滤，理论上已经隔开了两个家庭；
+        这里再按 family_id 拦一道是**纵深防御**——
+        万一哪天 member_id 撞号（两家都叫 member_001），
+        召回阶段也不能把别家的偏好喂进 prompt。
+        """
         cfg = self.settings.memory
         now = time.time()
 
@@ -223,6 +232,12 @@ class MemoryService:
                     continue
                 # 权限二次校验：召回阶段就过滤，敏感内容不能进上下文
                 if role_level(record.visible_role) > role_level(viewer_role):
+                    continue
+                # 租户二次校验：跨家庭的记忆绝不进上下文
+                if record.family_id != family_id:
+                    logger.warning("cross-family recall blocked: %s", record.family_id,
+                                   extra={"extra_fields": {"event": "memory.cross_family_block",
+                                                           "family": record.family_id}})
                     continue
 
                 days = (now - record.last_access_at) / 86400.0
@@ -256,10 +271,16 @@ class MemoryService:
         member_id: str,
         text: str,
         threshold: float = 0.85,
+        family_id: str = DEFAULT_FAMILY_ID,
     ) -> tuple[Any, float] | None:
-        """查找与 text 内容高度相似的已有记忆，返回 (记录, 相似度) 或 None。"""
+        """查找与 text 内容高度相似的已有记忆，返回 (记录, 相似度) 或 None。
+
+        只在**本家庭内**比对：两家的"喜欢空调 26 度"是两条各自独立的记忆，
+        不能因为内容像就合并成一条。
+        """
         best: tuple[Any, float] | None = None
-        for r in self.long_term.list_by_member(member_id, viewer_role="L4"):
+        for r in self.long_term.list_by_member(member_id, viewer_role="L4",
+                                               family_id=family_id):
             sim = jaccard_similarity(text, r.memory_value)
             if sim >= threshold and (best is None or sim > best[1]):
                 best = (r, sim)
@@ -297,24 +318,28 @@ class MemoryService:
                                                     "removed": r.memory_key}})
         return removed
 
-    def forget(self, member_id: str, memory_key: str) -> bool:
-        """主动遗忘（硬删除，双库同清，NFR-COMP-001）。"""
+    def forget(self, member_id: str, memory_key: str,
+               family_id: str = DEFAULT_FAMILY_ID) -> bool:
+        """主动遗忘（硬删除，双库同清，NFR-COMP-001）。只删本家庭的。"""
         record = None
-        for r in self.long_term.list_by_member(member_id, viewer_role="L4"):
+        for r in self.long_term.list_by_member(member_id, viewer_role="L4",
+                                               family_id=family_id):
             if r.memory_key == memory_key:
                 record = r
                 break
         if record is None:
             return False
         self.semantic.delete(record.memory_id)
-        return self.long_term.delete(member_id, memory_key)
+        return self.long_term.delete(member_id, memory_key, family_id=family_id)
 
-    def forget_by_keyword(self, member_id: str, keyword: str) -> int:
+    def forget_by_keyword(self, member_id: str, keyword: str,
+                          family_id: str = DEFAULT_FAMILY_ID) -> int:
         """按关键词批量遗忘。"""
         removed = 0
-        for r in self.long_term.list_by_member(member_id, viewer_role="L4"):
+        for r in self.long_term.list_by_member(member_id, viewer_role="L4",
+                                               family_id=family_id):
             if keyword in r.memory_value or keyword in r.memory_key:
-                if self.forget(member_id, r.memory_key):
+                if self.forget(member_id, r.memory_key, family_id=family_id):
                     removed += 1
         return removed
 

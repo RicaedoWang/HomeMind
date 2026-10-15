@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any, TypedDict
 
+from ..core.tenancy import DEFAULT_FAMILY_ID
+
 
 class AgentState(TypedDict, total=False):
     """一次对话在 Agent 内部的完整流转状态。
@@ -16,6 +18,7 @@ class AgentState(TypedDict, total=False):
     字段说明：
         trace_id       全链路追踪 ID（FR-OPS-001）
         user_input     用户原始输入
+        family_id      家庭（租户）ID，贯穿工具与记忆的隔离边界
         member_id      家庭成员 ID，用于记忆与权限（FR-MEM-008）
         member_role    成员权限角色 L1~L4，决定能召回哪些记忆
         confirmed      用户是否已对高危动作确认（FR-SEC-001）
@@ -38,6 +41,7 @@ class AgentState(TypedDict, total=False):
 
     trace_id: str
     user_input: str
+    family_id: str
     member_id: str
     member_role: str
     confirmed: bool
@@ -66,11 +70,18 @@ def initial_state(
     trace_id: str = "-",
     chat_history: list[dict[str, str]] | None = None,
     chat_summary: str = "",
+    family_id: str = DEFAULT_FAMILY_ID,
 ) -> AgentState:
-    """构造初始状态，字段一次性初始化，避免节点里到处 get 默认值。"""
+    """构造初始状态，字段一次性初始化，避免节点里到处 get 默认值。
+
+    family_id 带默认值是为了让单测/评测（没有登录态）能跑，
+    但 API 入口必须显式传 user.family_id——漏传等于让这次对话
+    读写默认家庭的设备与记忆。
+    """
     return {
         "trace_id": trace_id,
         "user_input": user_input,
+        "family_id": family_id,
         "member_id": member_id,
         "member_role": member_role,
         "confirmed": confirmed,

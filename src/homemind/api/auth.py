@@ -88,7 +88,7 @@ async def logout(user: AuthUser = Depends(current_user)) -> dict[str, Any]:
     """
     from ..memory.short_term import get_short_term_memory
 
-    await get_short_term_memory().clear(f"console:{user.member_id}")
+    await get_short_term_memory().clear(f"console:{user.family_id}:{user.member_id}")
     logger.info("logout: %s", user.member_id,
                 extra={"extra_fields": {"event": "auth.logout",
                                         "family_id": user.family_id,

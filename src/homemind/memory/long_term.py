@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ..core.tenancy import DEFAULT_FAMILY_ID
 from ..core.trace import get_logger
 
 logger = get_logger("memory.long_term")
@@ -48,6 +49,7 @@ class MemoryRecord:
     """一条长期记忆。"""
 
     memory_id: int
+    family_id: str
     member_id: str
     memory_type: str
     memory_key: str
@@ -62,6 +64,7 @@ class MemoryRecord:
     def to_dict(self) -> dict[str, Any]:
         return {
             "memory_id": self.memory_id,
+            "family_id": self.family_id,
             "member_id": self.member_id,
             "memory_type": self.memory_type,
             "memory_key": self.memory_key,
@@ -79,7 +82,11 @@ class LongTermMemory:
     """长期记忆存储（SQLite 实现）。"""
 
     def __init__(self, db_path: str | None = None) -> None:
-        self.db_path = db_path or "data/homemind_memory.db"
+        # 默认库统一到 data/homemind.db。
+        # 以前这里默认是 homemind_memory.db，而控制台"我的习惯"页读的是 homemind.db，
+        # 结果 AI 记住的东西在习惯页里看不到——两个库各写各的。
+        # 一个项目只有一个真相库，CLI / Web / AI 全部指向它。
+        self.db_path = db_path or "data/homemind.db"
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
 
@@ -94,6 +101,7 @@ class LongTermMemory:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS memory_struct (
                     memory_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+                    family_id     TEXT NOT NULL DEFAULT 'family_sz',
                     member_id     TEXT NOT NULL,
                     memory_type   TEXT NOT NULL,
                     memory_key    TEXT NOT NULL,
@@ -104,7 +112,7 @@ class LongTermMemory:
                     created_at    REAL NOT NULL,
                     updated_at    REAL NOT NULL,
                     last_access_at REAL NOT NULL,
-                    UNIQUE(member_id, memory_key)
+                    UNIQUE(family_id, member_id, memory_key)
                 )
             """)
             conn.execute("""
@@ -116,6 +124,56 @@ class LongTermMemory:
                     changed_at  REAL NOT NULL
                 )
             """)
+        # 老库（V0.9 之前建的）没有 family_id 列，CREATE TABLE IF NOT EXISTS
+        # 会直接跳过建表，必须靠这一步补上。
+        self._migrate_family_id()
+
+    def _migrate_family_id(self) -> None:
+        """给老库补上 family_id 列，并把唯一键升级成三元组。
+
+        SQLite 不支持 ALTER TABLE 改唯一约束，只能"建新表 → 搬数据 → 删旧表 → 改名"。
+        存量数据一律归入默认家庭（family_sz）——它们是单家庭时期写的，
+        本来就不属于任何"第二个家庭"，归到默认家是最贴近事实的猜测。
+
+        全程在一个事务里做：中途崩了旧表还在，不会丢数据。
+        """
+        with self._connect() as conn:
+            columns = {r["name"] for r in conn.execute("PRAGMA table_info(memory_struct)")}
+            if "family_id" in columns:
+                return
+
+            logger.warning("memory_struct 缺少 family_id，开始迁移到租户版表结构",
+                           extra={"extra_fields": {"event": "memory.migrate"}})
+            conn.execute("""
+                CREATE TABLE memory_struct_v2 (
+                    memory_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+                    family_id     TEXT NOT NULL DEFAULT 'family_sz',
+                    member_id     TEXT NOT NULL,
+                    memory_type   TEXT NOT NULL,
+                    memory_key    TEXT NOT NULL,
+                    memory_value  TEXT NOT NULL,
+                    version       INTEGER NOT NULL DEFAULT 1,
+                    importance    REAL NOT NULL DEFAULT 0.5,
+                    visible_role  TEXT NOT NULL DEFAULT 'L3',
+                    created_at    REAL NOT NULL,
+                    updated_at    REAL NOT NULL,
+                    last_access_at REAL NOT NULL,
+                    UNIQUE(family_id, member_id, memory_key)
+                )
+            """)
+            conn.execute("""
+                INSERT INTO memory_struct_v2
+                  (memory_id, family_id, member_id, memory_type, memory_key, memory_value,
+                   version, importance, visible_role, created_at, updated_at, last_access_at)
+                  SELECT memory_id, 'family_sz', member_id, memory_type, memory_key,
+                         memory_value, version, importance, visible_role,
+                         created_at, updated_at, last_access_at
+                  FROM memory_struct
+            """)
+            conn.execute("DROP TABLE memory_struct")
+            conn.execute("ALTER TABLE memory_struct_v2 RENAME TO memory_struct")
+            logger.warning("memory_struct 迁移完成：唯一键已升级为 (family_id, member_id, memory_key)",
+                           extra={"extra_fields": {"event": "memory.migrate_done"}})
 
     def upsert(
         self,
@@ -125,25 +183,30 @@ class LongTermMemory:
         memory_value: str,
         importance: float = 0.5,
         visible_role: str = "L3",
+        family_id: str = DEFAULT_FAMILY_ID,
     ) -> MemoryRecord:
         """写入或更新记忆。
 
-        同 (member_id, memory_key) 已存在时：版本 +1、旧值进历史表（FR-MEM-006）。
+        同 (family_id, member_id, memory_key) 已存在时：版本 +1、旧值进历史表（FR-MEM-006）。
+
+        注意 family_id 排在最后且有默认值，是为了不破坏既有的位置参数调用。
+        但**默认值只是给单测/评测兜底**，生产路径必须显式传——
+        漏传意味着这条记忆被写进了默认家庭，属于数据放错地方。
         """
         now = time.time()
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT * FROM memory_struct WHERE member_id=? AND memory_key=?",
-                (member_id, memory_key),
+                "SELECT * FROM memory_struct WHERE family_id=? AND member_id=? AND memory_key=?",
+                (family_id, member_id, memory_key),
             ).fetchone()
 
             if row is None:
                 cursor = conn.execute(
                     """INSERT INTO memory_struct
-                       (member_id, memory_type, memory_key, memory_value, version,
+                       (family_id, member_id, memory_type, memory_key, memory_value, version,
                         importance, visible_role, created_at, updated_at, last_access_at)
-                       VALUES (?,?,?,?,?,?,?,?,?,?)""",
-                    (member_id, memory_type, memory_key, memory_value, 1,
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                    (family_id, member_id, memory_type, memory_key, memory_value, 1,
                      importance, visible_role, now, now, now),
                 )
                 memory_id = cursor.lastrowid or 0
@@ -184,13 +247,15 @@ class LongTermMemory:
         member_id: str,
         memory_type: str | None = None,
         viewer_role: str = "L4",
+        family_id: str = DEFAULT_FAMILY_ID,
     ) -> list[MemoryRecord]:
-        """列出某成员的记忆，按查看者权限过滤（FR-MEM-008）。
+        """列出某成员在本家庭内的记忆，按查看者权限过滤（FR-MEM-008）。
 
         权限规则：只能看到 visible_role 等级 <= 自己等级 的记忆。
+        租户规则：只查本家庭——即使 member_id 撞号，别的家庭也看不到。
         """
-        sql = "SELECT * FROM memory_struct WHERE member_id=?"
-        params: list[Any] = [member_id]
+        sql = "SELECT * FROM memory_struct WHERE family_id=? AND member_id=?"
+        params: list[Any] = [family_id, member_id]
         if memory_type:
             sql += " AND memory_type=?"
             params.append(memory_type)
@@ -239,15 +304,18 @@ class LongTermMemory:
             conn.execute("DELETE FROM memory_history WHERE memory_id=?", (memory_id,))
             return True
 
-    def delete(self, member_id: str, memory_key: str) -> bool:
+    def delete(self, member_id: str, memory_key: str,
+               family_id: str = DEFAULT_FAMILY_ID) -> bool:
         """硬删除（用户主动遗忘 / 撤回授权，NFR-COMP-001）。
 
         注意：这是真删除，不是软删除标记——用户说"忘掉"就该真忘掉。
+        删除也带 family_id：不能让一个家庭的操作删掉另一个家庭的记忆。
         """
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT memory_id FROM memory_struct WHERE member_id=? AND memory_key=?",
-                (member_id, memory_key),
+                "SELECT memory_id FROM memory_struct"
+                " WHERE family_id=? AND member_id=? AND memory_key=?",
+                (family_id, member_id, memory_key),
             ).fetchone()
             if row is None:
                 return False
@@ -304,6 +372,7 @@ class LongTermMemory:
     def _to_record(row: sqlite3.Row) -> MemoryRecord:
         return MemoryRecord(
             memory_id=row["memory_id"],
+            family_id=row["family_id"] if "family_id" in row.keys() else DEFAULT_FAMILY_ID,
             member_id=row["member_id"],
             memory_type=row["memory_type"],
             memory_key=row["memory_key"],

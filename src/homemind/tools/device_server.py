@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..core.models import DeviceState
+from ..core.tenancy import DEFAULT_FAMILY_ID, FAMILY_ARG
 from ..core.trace import get_logger
 from .registry import ToolSpec
 
@@ -19,20 +20,38 @@ logger = get_logger("tools.device")
 
 # ---------------- Mock 设备层 ----------------
 # 真实环境这里应替换为设备厂商网关 / IoT 平台的调用
-_DEVICES: dict[str, DeviceState] = {
-    "living_room_light": DeviceState("living_room_light", "客厅灯", "客厅", "light"),
-    "living_room_ac": DeviceState("living_room_ac", "客厅空调", "客厅", "ac", value=26.0),
-    "living_room_curtain": DeviceState("living_room_curtain", "客厅窗帘", "客厅", "curtain"),
-    "bedroom_light": DeviceState("bedroom_light", "主卧灯", "主卧", "light"),
-    "front_door_lock": DeviceState("front_door_lock", "大门门锁", "玄关", "lock"),
-    # 以下为控制台界面补齐的设备（洗衣机/晾衣机/扫地机/加湿器/浇花器），
-    # 命名刻意避开"灯""空调""窗帘""门锁"等已有子串，不影响既有模糊匹配。
-    "balcony_washer": DeviceState("balcony_washer", "洗衣机", "阳台", "washer"),
-    "balcony_dryer": DeviceState("balcony_dryer", "智能晾衣机", "阳台", "dryer"),
-    "living_room_robot": DeviceState("living_room_robot", "扫地机器人", "客厅", "robot"),
-    "bedroom_humidifier": DeviceState("bedroom_humidifier", "加湿器", "主卧", "humidifier",
-                                      value=50.0),
-    "balcony_valve": DeviceState("balcony_valve", "智能浇花器", "阳台", "valve"),
+
+# 设备按家庭分桶：Dict[family_id, Dict[device_id, DeviceState]]。
+# 两个家庭可以有同名甚至同 id 的设备（都有"客厅灯"），
+# 它们是两个家庭的**不同实体**，绝不能共享一份状态。
+_DEVICES: dict[str, dict[str, DeviceState]] = {
+    # 深圳的家：亚热带，靠空调和加湿器
+    "family_sz": {
+        "living_room_light": DeviceState("living_room_light", "客厅灯", "客厅", "light"),
+        "living_room_ac": DeviceState("living_room_ac", "客厅空调", "客厅", "ac", value=26.0),
+        "living_room_curtain": DeviceState("living_room_curtain", "客厅窗帘", "客厅", "curtain"),
+        "bedroom_light": DeviceState("bedroom_light", "主卧灯", "主卧", "light"),
+        "front_door_lock": DeviceState("front_door_lock", "大门门锁", "玄关", "lock"),
+        # 以下为控制台界面补齐的设备（洗衣机/晾衣机/扫地机/加湿器/浇花器），
+        # 命名刻意避开"灯""空调""窗帘""门锁"等已有子串，不影响既有模糊匹配。
+        "balcony_washer": DeviceState("balcony_washer", "洗衣机", "阳台", "washer"),
+        "balcony_dryer": DeviceState("balcony_dryer", "智能晾衣机", "阳台", "dryer"),
+        "living_room_robot": DeviceState("living_room_robot", "扫地机器人", "客厅", "robot"),
+        "bedroom_humidifier": DeviceState("bedroom_humidifier", "加湿器", "主卧", "humidifier",
+                                          value=50.0),
+        "balcony_valve": DeviceState("balcony_valve", "智能浇花器", "阳台", "valve"),
+    },
+    # 青岛的家：海边湿冷，靠地暖和新风——设备清单刻意与深圳不同，
+    # 这样"两个家庭数据不同"一眼就能看出来，不是同一个列表换个名字。
+    "family_qd": {
+        "living_room_light": DeviceState("living_room_light", "客厅灯", "客厅", "light"),
+        "living_room_heater": DeviceState("living_room_heater", "客厅地暖", "客厅", "heater",
+                                          value=20.0),
+        "living_room_fan": DeviceState("living_room_fan", "新风系统", "客厅", "fan"),
+        "kitchen_hood": DeviceState("kitchen_hood", "厨房油烟机", "厨房", "hood"),
+        "balcony_dryer_qd": DeviceState("balcony_dryer_qd", "阳台晾衣机", "阳台", "dryer"),
+        "entry_lock": DeviceState("entry_lock", "入户门锁", "玄关", "lock"),
+    },
 }
 
 # 高危设备：动作执行前强制确认
@@ -41,41 +60,66 @@ _HIGH_RISK_TYPES = {"lock", "gas_valve"}
 # 初始设备快照：评测（以及任何需要可复现结果的场景）靠它把状态打回原点。
 # Mock 状态是模块级全局的——第 1 条用例把灯关了，第 20 条查到的就是"关"，
 # 不重置的话评测结果根本不可复现。
-_INITIAL_DEVICES: dict[str, DeviceState] = {
-    key: DeviceState(device_id=dev.device_id, name=dev.name, room=dev.room,
-                     device_type=dev.device_type, power=dev.power, value=dev.value)
-    for key, dev in _DEVICES.items()
+_INITIAL_DEVICES: dict[str, dict[str, DeviceState]] = {
+    family_id: {
+        key: DeviceState(device_id=dev.device_id, name=dev.name, room=dev.room,
+                         device_type=dev.device_type, power=dev.power, value=dev.value)
+        for key, dev in bucket.items()
+    }
+    for family_id, bucket in _DEVICES.items()
 }
 
 
+def devices_of(family_id: str | None = None) -> dict[str, DeviceState]:
+    """取某个家庭的设备桶。未知家庭返回空桶（不自动建，避免脏数据）。"""
+    return _DEVICES.get(family_id or DEFAULT_FAMILY_ID, {})
+
+
+def _resolve_family(args: dict[str, Any]) -> str:
+    """取服务端注入的租户标识。
+
+    只认 `__family_id`——它不在工具 Schema 里，模型看不见也造不出来。
+    刻意**不读**不带下划线的同名参数：那是模型可能幻觉出来的字段，
+    一旦采信，等于把"去操作哪个家庭"的决定权交给了模型输出。
+    """
+    return args.get(FAMILY_ARG) or DEFAULT_FAMILY_ID
+
+
 def reset_devices() -> None:
-    """把 Mock 设备状态重置为初始值（评测与测试前置调用）。"""
-    for key, snapshot in _INITIAL_DEVICES.items():
-        _DEVICES[key] = DeviceState(
-            device_id=snapshot.device_id, name=snapshot.name, room=snapshot.room,
-            device_type=snapshot.device_type, power=snapshot.power, value=snapshot.value,
-        )
+    """把所有家庭的 Mock 设备状态重置为初始值（评测与测试前置调用）。"""
+    for family_id, snapshot in _INITIAL_DEVICES.items():
+        bucket = _DEVICES.setdefault(family_id, {})
+        for key, dev in snapshot.items():
+            bucket[key] = DeviceState(
+                device_id=dev.device_id, name=dev.name, room=dev.room,
+                device_type=dev.device_type, power=dev.power, value=dev.value,
+            )
 
 
-def _find_device(device_name: str | None, room: str | None = None) -> DeviceState | None:
-    """按名称模糊匹配设备，可带房间限定。
+def _find_device(
+    device_name: str | None,
+    room: str | None = None,
+    family_id: str | None = None,
+) -> DeviceState | None:
+    """按名称模糊匹配设备，可带房间限定，且**只在指定家庭内找**。
 
     匹配优先级：完全匹配名称 > 名称子串 > 房间 + 类型子串
     """
+    bucket = devices_of(family_id)
     if not device_name:
         if room:
-            for dev in _DEVICES.values():
+            for dev in bucket.values():
                 if dev.room == room:
                     return dev
         return None
 
     # 完全匹配
-    for dev in _DEVICES.values():
+    for dev in bucket.values():
         if dev.name == device_name:
             return dev
 
     # 子串匹配（"灯" 命中 "客厅灯"，配合 room 可消歧）
-    candidates = [d for d in _DEVICES.values() if device_name in d.name]
+    candidates = [d for d in bucket.values() if device_name in d.name]
     if room:
         candidates = [d for d in candidates if d.room == room]
     return candidates[0] if candidates else None
@@ -87,8 +131,9 @@ async def _handle_device_control(args: dict[str, Any]) -> dict[str, Any]:
     device_name: str | None = args.get("device_name")
     room: str | None = args.get("room")
     value: float | None = args.get("value")
+    family_id = _resolve_family(args)
 
-    device = _find_device(device_name, room)
+    device = _find_device(device_name, room, family_id)
     if device is None:
         return {
             "success": False,
@@ -122,9 +167,10 @@ async def _handle_device_control(args: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _handle_device_list(args: dict[str, Any]) -> dict[str, Any]:
-    """列出全部设备状态。"""
+    """列出本家庭的设备状态（绝不会列出别的家庭的设备）。"""
     room: str | None = args.get("room")
-    devices = [d for d in _DEVICES.values() if room is None or d.room == room]
+    family_id = _resolve_family(args)
+    devices = [d for d in devices_of(family_id).values() if room is None or d.room == room]
     return {
         "success": True,
         "devices": [d.to_dict() for d in devices],
@@ -187,7 +233,8 @@ def build_device_tools() -> list[ToolSpec]:
 async def _handle_lock_control(args: dict[str, Any]) -> dict[str, Any]:
     """门锁控制（高危）。"""
     action: str = args.get("action", "")
-    device = _find_device(args.get("device_name") or "门锁")
+    family_id = _resolve_family(args)
+    device = _find_device(args.get("device_name") or "门锁", None, family_id)
     if device is None:
         return {"success": False, "message": "没有找到门锁设备"}
     device.power = action == "unlock"
@@ -197,13 +244,20 @@ async def _handle_lock_control(args: dict[str, Any]) -> dict[str, Any]:
     return {"success": True, "message": message, "device": device.to_dict()}
 
 
-def reset_devices() -> None:
-    """重置全部设备到初始态（测试用）。"""
-    for dev in _DEVICES.values():
-        dev.power = False
-    _DEVICES["living_room_ac"].value = 26.0
+def get_device_states(family_id: str | None = None) -> dict[str, DeviceState]:
+    """获取某个家庭的设备态（演示界面 / 控制台用）。
+
+    注意这里返回的是**桶内引用**，不是拷贝——控制台靠它读实时状态，
+    改状态必须走工具（device_control），不要在这里直接改，
+    否则就绕开了超时/重试/熔断/幂等那一整套治理。
+    """
+    return devices_of(family_id)
 
 
-def get_device_states() -> dict[str, DeviceState]:
-    """获取设备态（演示界面用）。"""
-    return _DEVICES
+def device_belongs_to(family_id: str, device_id: str) -> bool:
+    """判断设备是否属于该家庭——跨家庭访问的断言就靠它。
+
+    接口层必须先过这一关再调工具：拿别家的 device_id 来控制，
+    要在**动设备之前**拦下来并返回 403，而不是先执行了再道歉。
+    """
+    return device_id in devices_of(family_id)

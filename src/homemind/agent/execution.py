@@ -17,6 +17,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from ..core.tenancy import DEFAULT_FAMILY_ID, FAMILY_ARG
 from ..tools.registry import ToolRegistry, make_idempotency_key
 
 
@@ -55,18 +56,27 @@ def apply_memory_to_arguments(
     return arguments, None
 
 
-async def resolve_delta(registry: ToolRegistry, arguments: dict[str, Any]) -> dict[str, Any]:
+async def resolve_delta(
+    registry: ToolRegistry,
+    arguments: dict[str, Any],
+    family_id: str = DEFAULT_FAMILY_ID,
+) -> dict[str, Any]:
     """增量调节解析：先查当前值，再算出目标值。
 
     例："空调调低两度" → 查到当前 26 度 → 目标 24 度。
     这两步必须串行，所以放在执行层而不是规划层。
+
+    查询那一步必须带租户：否则"查当前值"查到的是默认家庭的空调，
+    再拿这个数字去设自己家的空调，结果就是莫名其妙的温度。
     """
     device_name = arguments.get("device_name")
     room = arguments.get("room")
     delta = float(arguments.get("delta", 1.0))
 
-    query = await registry.call("device_control",
-                                {"action": "query", "device_name": device_name, "room": room})
+    query = await registry.call(
+        "device_control",
+        {"action": "query", "device_name": device_name, "room": room, FAMILY_ARG: family_id},
+    )
     current = 26.0
     if query.ok and query.data.get("device"):
         current = query.data["device"].get("value") or 26.0
@@ -89,13 +99,19 @@ async def execute_task(
     tool_name = task.get("tool_name")
     arguments = dict(task.get("arguments", {}))
     applied_mem: dict[str, Any] | None = None
+    family_id = state.get("family_id") or DEFAULT_FAMILY_ID
 
     if arguments.get("action") in ("delta_up", "delta_down"):
-        arguments = await resolve_delta(registry, arguments)
+        arguments = await resolve_delta(registry, arguments, family_id=family_id)
     else:
         arguments, applied_mem = apply_memory_to_arguments(
             arguments, state.get("recalled_memories", [])
         )
+
+    # 租户注入：工具只认服务端给的 __family_id。
+    # 这里用赋值而不是 setdefault——万一参数里混进了同名键（模型幻觉或旧数据），
+    # 一律以 state 里的服务端值为准覆盖掉。
+    arguments[FAMILY_ARG] = family_id
 
     idem_key = None
     spec = registry.get(tool_name)

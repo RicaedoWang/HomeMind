@@ -31,11 +31,11 @@ from ..auth.tokens import AuthUser
 from ..agent.state import initial_state
 from ..auth.store import FAMILIES
 from ..core.trace import get_logger, new_trace_id, set_trace_id
-from ..memory.long_term import LongTermMemory
-from ..memory.service import MemoryService
+from ..memory.service import get_memory_service
 from ..memory.short_term import get_short_term_memory
 from ..tools.calendar_server import get_schedules
-from ..tools.device_server import _DEVICES, get_device_states
+from ..core.tenancy import DEFAULT_FAMILY_ID, FAMILY_ARG
+from ..tools.device_server import devices_of, get_device_states
 from ..tools.registry import default_registry
 
 logger = get_logger("api.console")
@@ -46,26 +46,54 @@ WEB_DIR = Path(__file__).resolve().parents[3] / "web"
 
 # ---------------------------------------------------------------- 静态数据
 
-FAMILY = [
-    {"id": "m1", "name": "我", "colorTag": "#4F7BFF", "role": "owner", "avatar": "我"},
-    {"id": "m2", "name": "妈妈", "colorTag": "#F472B6", "role": "admin", "avatar": "妈"},
-    {"id": "m3", "name": "爸爸", "colorTag": "#22D3A8", "role": "member", "avatar": "爸"},
-]
+# 家庭成员按租户分桶：小明家只有他一个人，不该看到深圳那三口。
+FAMILY_MEMBERS: dict[str, list[dict[str, Any]]] = {
+    "family_sz": [
+        {"id": "m1", "name": "我", "colorTag": "#4F7BFF", "role": "owner", "avatar": "我"},
+        {"id": "m2", "name": "妈妈", "colorTag": "#F472B6", "role": "admin", "avatar": "妈"},
+        {"id": "m3", "name": "爸爸", "colorTag": "#22D3A8", "role": "member", "avatar": "爸"},
+    ],
+    "family_qd": [
+        {"id": "m101", "name": "小明", "colorTag": "#4F7BFF", "role": "owner", "avatar": "明"},
+    ],
+}
 
-# 场景：执行时按顺序作用于设备
-SCENES = [
-    {"id": "home", "name": "回家", "icon": "home",
-     "actions": [("living_room_light", "turn_on", 60), ("living_room_curtain", "turn_on", 100)]},
-    {"id": "away", "name": "离家", "icon": "exit",
-     "actions": [("living_room_light", "turn_off", None), ("living_room_ac", "turn_off", None),
-                 ("living_room_curtain", "turn_off", None)]},
-    {"id": "movie", "name": "观影", "icon": "movie",
-     "actions": [("living_room_light", "set_value", 20), ("living_room_curtain", "turn_off", None)]},
-    {"id": "sleep", "name": "睡眠", "icon": "moon",
-     "actions": [("living_room_light", "turn_off", None), ("bedroom_light", "set_value", 8)]},
-    {"id": "wake", "name": "起床", "icon": "sun",
-     "actions": [("bedroom_light", "turn_on", 80), ("living_room_curtain", "turn_on", 60)]},
-]
+# 场景按租户分桶：海边湿冷的家需要"通风"，深圳的家需要"除湿"——
+# 场景清单跟着设备走，拿深圳的设备列表去执行青岛的场景只会全是空转。
+SCENES: dict[str, list[dict[str, Any]]] = {
+    "family_sz": [
+        {"id": "home", "name": "回家", "icon": "home",
+         "actions": [("living_room_light", "turn_on", 60),
+                     ("living_room_curtain", "turn_on", 100)]},
+        {"id": "away", "name": "离家", "icon": "exit",
+         "actions": [("living_room_light", "turn_off", None),
+                     ("living_room_ac", "turn_off", None),
+                     ("living_room_curtain", "turn_off", None)]},
+        {"id": "movie", "name": "观影", "icon": "movie",
+         "actions": [("living_room_light", "set_value", 20),
+                     ("living_room_curtain", "turn_off", None)]},
+        {"id": "sleep", "name": "睡眠", "icon": "moon",
+         "actions": [("living_room_light", "turn_off", None),
+                     ("bedroom_light", "set_value", 8)]},
+        {"id": "wake", "name": "起床", "icon": "sun",
+         "actions": [("bedroom_light", "turn_on", 80),
+                     ("living_room_curtain", "turn_on", 60)]},
+    ],
+    "family_qd": [
+        {"id": "home", "name": "回家", "icon": "home",
+         "actions": [("living_room_light", "turn_on", 60),
+                     ("living_room_heater", "turn_on", None)]},
+        {"id": "away", "name": "离家", "icon": "exit",
+         "actions": [("living_room_light", "turn_off", None),
+                     ("living_room_heater", "turn_off", None)]},
+        {"id": "sleep", "name": "睡眠", "icon": "moon",
+         "actions": [("living_room_light", "turn_off", None),
+                     ("living_room_heater", "set_value", 18)]},
+        {"id": "vent", "name": "通风", "icon": "wind",
+         "actions": [("living_room_fan", "turn_on", None),
+                     ("kitchen_hood", "turn_off", None)]},
+    ],
+}
 
 CATEGORY_COLORS = {
     "plant": "#34D399", "laundry": "#60A5FA", "cleaning": "#A78BFA",
@@ -75,15 +103,22 @@ CATEGORY_COLORS = {
 
 # ---------------------------------------------------------------- 任务存储
 
-_TASKS: list[dict[str, Any]] = []
+# 任务也按租户分桶：小明打开控制台看到的是"更换新风滤芯"，
+# 不该是"给深圳那只猫加粮"——两个家庭的家务本来就不是一回事。
+_TASKS: dict[str, list[dict[str, Any]]] = {"family_sz": [], "family_qd": []}
+
+
+def tasks_of(family_id: str) -> list[dict[str, Any]]:
+    """取某个家庭的任务列表。"""
+    return _TASKS.setdefault(family_id, [])
 
 
 def _seed_tasks() -> None:
     """种子任务：刻意覆盖文档里的典型场景（逾期 / 设备触发 / AI 添加 / 手动）。"""
-    if _TASKS:
+    if _TASKS["family_sz"]:
         return
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    _TASKS.extend([
+    _TASKS["family_sz"].extend([
         {
             "id": "t-plant", "title": "给阳台的绿萝浇花",
             "description": "土壤湿度 28%，已 3 天未浇",
@@ -125,11 +160,44 @@ def _seed_tasks() -> None:
             "createdAt": (datetime.now() - timedelta(hours=1)).isoformat(),
         },
     ])
+    _TASKS["family_qd"].extend([
+        {
+            "id": "t-qd-filter", "title": "更换新风系统滤芯",
+            "description": "滤芯寿命剩余 8%，海雾天建议提前换",
+            "iconKey": "tool", "category": "maintenance", "source": "automation",
+            "creatorId": "m101", "assigneeIds": ["m101"], "roomId": "living",
+            "dueAt": (today + timedelta(hours=20)).isoformat(),
+            "priority": "urgent", "status": "pending",
+            "linkedDeviceIds": ["living_room_fan"], "completionAction": "notify-only",
+            "createdAt": (datetime.now() - timedelta(hours=5)).isoformat(),
+        },
+        {
+            "id": "t-qd-defrost", "title": "地暖除霜提醒",
+            "description": "室外 12°C，地暖建议保持在 20°C 以上",
+            "iconKey": "thermometer", "category": "maintenance", "source": "automation",
+            "creatorId": "m101", "assigneeIds": ["m101"], "roomId": "living",
+            "dueAt": (today + timedelta(hours=17)).isoformat(),
+            "priority": "normal", "status": "pending",
+            "linkedDeviceIds": ["living_room_heater"], "completionAction": "control-device",
+            "createdAt": (datetime.now() - timedelta(hours=3)).isoformat(),
+        },
+        {
+            "id": "t-qd-laundry", "title": "收阳台的衣服",
+            "description": "海雾天湿度 45%，晾了一天该收了",
+            "iconKey": "laundry", "category": "laundry", "source": "manual",
+            "creatorId": "m101", "assigneeIds": ["m101"], "roomId": "balcony",
+            "dueAt": (today + timedelta(hours=19)).isoformat(),
+            "priority": "normal", "status": "pending",
+            "linkedDeviceIds": ["balcony_dryer_qd"], "completionAction": "control-device",
+            "createdAt": (datetime.now() - timedelta(minutes=30)).isoformat(),
+        },
+    ])
 
 
 def reset_tasks() -> None:
     """重置任务存储（测试前置调用，避免用例间互相污染）。"""
-    _TASKS.clear()
+    for bucket in _TASKS.values():
+        bucket.clear()
     _seed_tasks()
 
 
@@ -138,13 +206,13 @@ _seed_tasks()
 # ---------------------------------------------------------------- 派生数据
 
 
-def _device_payload() -> list[dict[str, Any]]:
-    """设备状态 → 前端卡片结构。
+def _device_payload(family_id: str) -> list[dict[str, Any]]:
+    """设备状态 → 前端卡片结构（只列本家庭的设备）。
 
     关键状态（亮度/温度/进度）必须在卡面可见，不点进详情也知道设备什么状态。
     """
     devices: list[dict[str, Any]] = []
-    for dev in get_device_states().values():
+    for dev in get_device_states(family_id).values():
         payload = {
             "id": dev.device_id,
             "name": dev.name,
@@ -195,54 +263,74 @@ def _device_payload() -> list[dict[str, Any]]:
     return devices
 
 
-def _env_payload() -> dict[str, Any]:
-    """环境数据：室内外温湿度 + 天气 + 空气质量。
+# 两个家庭的室内外环境基线（演示用种子数据，不是真实传感器读数）
+_ENV_BASELINE: dict[str, dict[str, Any]] = {
+    "family_sz": {"indoor_temp": 24.5, "humidity": 62, "outdoor": 25.0,
+                  "high": 28, "low": 21, "condition": "sunny", "conditionText": "晴",
+                  "aqi": 43, "aqi_level": "优", "sensor": "客厅"},
+    "family_qd": {"indoor_temp": 18.2, "humidity": 45, "outdoor": 12.0,
+                  "high": 15, "low": 8, "condition": "fog", "conditionText": "海雾",
+                  "aqi": 72, "aqi_level": "良", "sensor": "客厅"},
+}
+
+
+def _env_payload(family_id: str) -> dict[str, Any]:
+    """环境数据：室内外温湿度 + 天气 + 空气质量（按家庭取，两家数据不同）。
 
     传感器缺数据时返回 None，前端显示"未接入传感器"——
     绝不编造一个看起来合理的数字出来（与 AI 能力边界红线同一原则）。
     """
     now = datetime.now()
+    base = _ENV_BASELINE.get(family_id, _ENV_BASELINE[DEFAULT_FAMILY_ID])
     drift = math.sin(now.hour / 24 * math.pi * 2) * 1.6
-    indoor_temp = round(24.5 + drift, 1)
-    indoor_humidity = 62
-    outdoor_high, outdoor_low = 28, 21
+    indoor_temp = round(base["indoor_temp"] + drift, 1)
     return {
         "date": now.strftime("%Y-%m-%d"),
         "weekday": now.strftime("%A"),
         "lunar": "九月初四",
-        "indoor": {"temp": indoor_temp, "humidity": indoor_humidity, "sensor": "客厅"},
-        "outdoor": {"temp": 25.0, "high": outdoor_high, "low": outdoor_low,
-                    "condition": "sunny", "conditionText": "晴"},
-        "aqi": {"value": 43, "level": "优"},
-        "tempDiffWarn": abs(indoor_temp - 25.0) >= 8,
+        "indoor": {"temp": indoor_temp, "humidity": base["humidity"], "sensor": base["sensor"]},
+        "outdoor": {"temp": base["outdoor"], "high": base["high"], "low": base["low"],
+                    "condition": base["condition"], "conditionText": base["conditionText"]},
+        "aqi": {"value": base["aqi"], "level": base["aqi_level"]},
+        "tempDiffWarn": abs(indoor_temp - base["outdoor"]) >= 8,
         "updatedAt": now.isoformat(timespec="seconds"),
     }
 
 
-def _comfort_hint(env: dict[str, Any]) -> dict[str, Any] | None:
-    """舒适度提示：按文档 5.2 的优先级表，同时最多返回 1 条。"""
+def _comfort_hint(env: dict[str, Any], family_id: str) -> dict[str, Any] | None:
+    """舒适度提示：按文档 5.2 的优先级表，同时最多返回 1 条。
+
+    提示里带的设备必须是本家庭真有的，否则青岛家会收到"开加湿器"这种
+    指向不存在设备的建议——点了没反应，比不给提示更让人困惑。
+    """
     indoor = env["indoor"]
-    if indoor["humidity"] < 35:
+    owned = set(get_device_states(family_id))
+    if indoor["humidity"] < 35 and "bedroom_humidifier" in owned:
         return {"level": "warning", "icon": "drop",
                 "text": f"室内偏干（{indoor['humidity']}%），皮肤和绿植都难受",
                 "action": {"label": "开加湿器", "deviceId": "bedroom_humidifier",
                            "action": "turn_on"}}
-    if indoor["humidity"] > 75:
+    if indoor["humidity"] > 75 and "living_room_ac" in owned:
         return {"level": "warning", "icon": "drop",
                 "text": f"室内偏潮（{indoor['humidity']}%），当心霉味",
                 "action": {"label": "开除湿", "deviceId": "living_room_ac",
                            "action": "turn_on"}}
-    if indoor["temp"] > 29:
+    if indoor["temp"] > 29 and "living_room_ac" in owned:
         return {"level": "info", "icon": "thermometer",
                 "text": f"客厅 {indoor['temp']}°C，要不把空调开上？",
                 "action": {"label": "开客厅空调 26°C", "deviceId": "living_room_ac",
                            "action": "set_value", "value": 26}}
-    if indoor["temp"] < 16:
+    if indoor["temp"] < 16 and "living_room_heater" in owned:
+        return {"level": "info", "icon": "thermometer",
+                "text": f"客厅 {indoor['temp']}°C，有点冷了",
+                "action": {"label": "开地暖 22°C", "deviceId": "living_room_heater",
+                           "action": "set_value", "value": 22}}
+    if indoor["temp"] < 16 and "living_room_ac" in owned:
         return {"level": "info", "icon": "thermometer",
                 "text": f"客厅 {indoor['temp']}°C，有点冷了",
                 "action": {"label": "开空调制热", "deviceId": "living_room_ac",
                            "action": "turn_on"}}
-    plant_task = next((t for t in _TASKS if t["category"] == "plant"
+    plant_task = next((t for t in tasks_of(family_id) if t["category"] == "plant"
                        and t["status"] == "pending"), None)
     if plant_task:
         return {"level": "info", "icon": "plant",
@@ -255,15 +343,26 @@ def _energy_payload() -> dict[str, Any]:
     return {"today": 3.2, "unit": "kWh", "delta": -12, "week": 24.6, "month": 108.4}
 
 
-def _messages_payload() -> list[dict[str, Any]]:
-    return [
+_MESSAGES: dict[str, list[dict[str, Any]]] = {
+    "family_sz": [
         {"id": "msg-1", "type": "device", "title": "洗衣机洗涤完成",
          "body": "已自动生成「晾晒衣服」任务", "time": "12 分钟前", "unread": True},
         {"id": "msg-2", "type": "security", "title": "入户门锁 18:20 开启",
          "body": "由「爸爸」的指纹开启", "time": "1 小时前", "unread": True},
         {"id": "msg-3", "type": "system", "title": "滤芯寿命不足 10%",
          "body": "空气净化器滤芯建议更换", "time": "昨天", "unread": False},
-    ]
+    ],
+    "family_qd": [
+        {"id": "msg-qd-1", "type": "device", "title": "新风滤芯寿命剩余 8%",
+         "body": "已自动生成「更换新风滤芯」任务", "time": "30 分钟前", "unread": True},
+        {"id": "msg-qd-2", "type": "system", "title": "室外海雾预警",
+         "body": "湿度偏高，建议开启通风模式", "time": "2 小时前", "unread": False},
+    ],
+}
+
+
+def _messages_payload(family_id: str) -> list[dict[str, Any]]:
+    return _MESSAGES.get(family_id, _MESSAGES[DEFAULT_FAMILY_ID])
 
 
 # ---------------------------------------------------------------- 接口
@@ -271,22 +370,26 @@ def _messages_payload() -> list[dict[str, Any]]:
 
 @router.get("/state")
 async def console_state(user: AuthUser = Depends(current_user)) -> dict[str, Any]:
-    """控制台全量状态：一次请求拿齐首页所需数据。"""
-    env = _env_payload()
-    pending = [t for t in _TASKS if t["status"] == "pending"]
+    """控制台全量状态：一次请求拿齐首页所需数据，**且只含本家庭的数据**。"""
+    family_id = user.family_id
+    env = _env_payload(family_id)
+    tasks = tasks_of(family_id)
+    pending = [t for t in tasks if t["status"] == "pending"]
+    devices = _device_payload(family_id)
     return {
         "env": env,
-        "hint": _comfort_hint(env),
+        "hint": _comfort_hint(env, family_id),
         "tasks": [dict(t, colorTag=CATEGORY_COLORS.get(t["category"], "#94A3B8"))
-                  for t in _TASKS],
+                  for t in tasks],
         "pendingCount": len(pending),
-        "devices": _device_payload(),
-        "rooms": sorted({d["room"] for d in _device_payload()}),
-        "scenes": [{"id": s["id"], "name": s["name"], "icon": s["icon"]} for s in SCENES],
+        "devices": devices,
+        "rooms": sorted({d["room"] for d in devices}),
+        "scenes": [{"id": s["id"], "name": s["name"], "icon": s["icon"]}
+                   for s in SCENES.get(family_id, [])],
         "schedules": get_schedules(),
         "energy": _energy_payload(),
-        "messages": _messages_payload(),
-        "family": FAMILY,
+        "messages": _messages_payload(family_id),
+        "family": FAMILY_MEMBERS.get(family_id, []),
         # 身份回显：前端据此显示"谁在看这个家"
         "viewer": {**user.to_dict(),
                    "familyName": FAMILIES.get(user.family_id, {}).get("name", user.family_id)},
@@ -308,18 +411,24 @@ async def control_device(
 ) -> dict[str, Any]:
     """控制设备。走工具注册中心，享受超时/重试/熔断/幂等治理。
 
-    操作人取自 token（`user.member_id`），**请求体里传的 member_id 一律忽略**——
-    否则谁都能伪造成别人来操作门锁。
+    两道隔离：
+    1. 操作人取自 token（`user.member_id`），**请求体里传的 member_id 一律忽略**——
+       否则谁都能伪造成别人来操作门锁。
+    2. 设备必须属于 token 里的家庭。不属于 → 403，且**状态一点都不动**。
+       这里刻意不返回 404：404 等于告诉对方"这个 id 存在但不属于你"，
+       是免费的资源枚举线索。
     """
-    device = _DEVICES.get(device_id)
+    family_id = user.family_id
+    device = devices_of(family_id).get(device_id)
     if device is None:
-        raise HTTPException(status_code=404, detail="设备不存在")
+        raise HTTPException(status_code=403, detail="无权操作该设备")
 
     # 高危设备：未确认不放行，与 Agent 主链路的护栏规则保持一致
     if device.device_type == "lock" and not req.confirmed:
         return {"ok": False, "requiresConfirm": True,
                 "message": "门锁属于高危操作，请先在卡片上确认",
-                "device": next((d for d in _device_payload() if d["id"] == device_id), None)}
+                "device": next((d for d in _device_payload(family_id)
+                                if d["id"] == device_id), None)}
 
     registry = default_registry()
     tool_name = "lock_control" if device.device_type == "lock" else "device_control"
@@ -328,6 +437,8 @@ async def control_device(
         if device.device_type == "lock" else req.action,
         "device_name": device.name,
         "room": device.room,
+        # 服务端注入租户：模型/请求体都碰不到这个字段
+        FAMILY_ARG: family_id,
     }
     if req.value is not None:
         arguments["value"] = req.value
@@ -337,7 +448,8 @@ async def control_device(
     # 会显示"后端说开了、卡片还关着"。
     return {"ok": result.ok, "tool": tool_name,
             "message": (result.data or {}).get("message", ""),
-            "device": next((d for d in _device_payload() if d["id"] == device_id), None),
+            "device": next((d for d in _device_payload(family_id)
+                            if d["id"] == device_id), None),
             "degraded": result.degraded, "error": result.error}
 
 
@@ -351,19 +463,24 @@ class SceneRequest(BaseModel):
 async def activate_scene(
     scene_id: str, req: SceneRequest, user: AuthUser = Depends(current_user)
 ) -> dict[str, Any]:
-    """执行场景：按顺序作用于一组设备，逐项返回回执。"""
-    scene = next((s for s in SCENES if s["id"] == scene_id), None)
+    """执行场景：按顺序作用于一组设备，逐项返回回执。
+
+    场景与设备都取自本家庭——拿深圳的场景清单去青岛家执行，
+    除了空转什么也不会发生。
+    """
+    family_id = user.family_id
+    scene = next((s for s in SCENES.get(family_id, []) if s["id"] == scene_id), None)
     if scene is None:
         raise HTTPException(status_code=404, detail="场景不存在")
 
     registry = default_registry()
     affected: list[dict[str, Any]] = []
     for device_id, action, value in scene["actions"]:
-        device = _DEVICES.get(device_id)
+        device = devices_of(family_id).get(device_id)
         if device is None:
             continue
         arguments: dict[str, Any] = {"action": action, "device_name": device.name,
-                                     "room": device.room}
+                                     "room": device.room, FAMILY_ARG: family_id}
         if value is not None:
             arguments["value"] = value
         result = await registry.call("device_control", arguments)
@@ -380,8 +497,9 @@ class TaskActionRequest(BaseModel):
     member_id: str = Field(default="member_001")
 
 
-def _find_task(task_id: str) -> dict[str, Any]:
-    task = next((t for t in _TASKS if t["id"] == task_id), None)
+def _find_task(family_id: str, task_id: str) -> dict[str, Any]:
+    """在本家庭的任务里找——别家的任务 id 一律当不存在（404，不透露更多信息）。"""
+    task = next((t for t in tasks_of(family_id) if t["id"] == task_id), None)
     if task is None:
         raise HTTPException(status_code=404, detail="任务不存在")
     return task
@@ -392,21 +510,22 @@ async def complete_task(
     task_id: str, req: TaskActionRequest, user: AuthUser = Depends(current_user)
 ) -> dict[str, Any]:
     """完成任务：置为 done，并触发关联设备联动。"""
-    task = _find_task(task_id)
+    family_id = user.family_id
+    task = _find_task(family_id, task_id)
     task["status"] = "done"
     task["completedAt"] = datetime.now().isoformat()
     task["completedBy"] = user.member_id
 
     linked: list[dict[str, Any]] = []
     for device_id in task.get("linkedDeviceIds", []):
-        device = _DEVICES.get(device_id)
+        device = devices_of(family_id).get(device_id)
         if device is None:
             continue
         action = "turn_off" if device_id == "front_door_lock" else "turn_on"
         result = await default_registry().call(
             "lock_control" if device.device_type == "lock" else "device_control",
             {"action": "lock" if device_id == "front_door_lock" else action,
-             "device_name": device.name, "room": device.room},
+             "device_name": device.name, "room": device.room, FAMILY_ARG: family_id},
         )
         linked.append({"deviceId": device_id, "name": device.name,
                        "ok": result.ok,
@@ -419,7 +538,7 @@ async def cancel_task(
     task_id: str, req: TaskActionRequest, user: AuthUser = Depends(current_user)
 ) -> dict[str, Any]:
     """取消任务：保留记录（不物理删除），可追溯。"""
-    task = _find_task(task_id)
+    task = _find_task(user.family_id, task_id)
     task["status"] = "cancelled"
     task["cancelReason"] = req.reason or "未填写原因"
     task["cancelledAt"] = datetime.now().isoformat()
@@ -432,7 +551,7 @@ async def reopen_task(
     task_id: str, user: AuthUser = Depends(current_user)
 ) -> dict[str, Any]:
     """撤销：把任务从 done/cancelled 回滚到 pending。"""
-    task = _find_task(task_id)
+    task = _find_task(user.family_id, task_id)
     task["status"] = "pending"
     for key in ("completedAt", "completedBy", "cancelledAt", "cancelledBy", "cancelReason"):
         task.pop(key, None)
@@ -465,7 +584,9 @@ async def assistant(
     trace_id = new_trace_id()
     set_trace_id(trace_id)
 
-    session_id = f"console:{user.member_id}"   # 请求体里的 session_id 不可信，忽略
+    # 会话键带家庭：换了家庭就是另一个会话，青岛家看不到深圳家聊过什么。
+    # 请求体里的 session_id 不可信，一律忽略。
+    session_id = f"console:{user.family_id}:{user.member_id}"
     memory = get_short_term_memory()
     await memory.append(session_id, "user", req.text)
     context = await memory.get_context(session_id)
@@ -474,6 +595,7 @@ async def assistant(
         user_input=req.text,
         member_id=user.member_id,
         member_role=user.role,
+        family_id=user.family_id,
         confirmed=req.confirmed,
         trace_id=trace_id,
         chat_history=context["messages"],
@@ -516,8 +638,12 @@ async def habits(user: AuthUser = Depends(current_user)) -> dict[str, Any]:
     按登录者自己的 member_id 查，并按其角色做可见性过滤——
     L1 访客不该看到管理员的偏好。
     """
-    service = MemoryService(long_term=LongTermMemory(db_path="data/homemind.db"))
-    records = service.long_term.list_by_member(user.member_id, viewer_role=user.role)
+    # 必须用与 assistant 同一个记忆服务实例：
+    # 这里要是自己 new 一个 MemoryService(另一个 db_path)，
+    # AI 记住的习惯在这一页就查不到——写和读必须是同一个库。
+    service = get_memory_service()
+    records = service.long_term.list_by_member(user.member_id, viewer_role=user.role,
+                                               family_id=user.family_id)
     return {
         "habits": [{"key": r.memory_key, "value": r.memory_value,
                     "type": r.memory_type, "version": getattr(r, "version", 1)}
