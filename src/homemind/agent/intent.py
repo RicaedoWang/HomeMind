@@ -159,12 +159,21 @@ def _classify(text: str) -> tuple[IntentType, float]:
     has_schedule = any(w in text for w in SCHEDULE_WORDS)
     has_knowledge = any(w in text for w in KNOWLEDGE_WORDS)
 
+    # 提醒判定必须压过设备判定（顺序改过一次，见下）：
+    # "提醒我晚上九点关灯" 里既有"灯"（设备）又有"关"（动作），
+    # 原来设备分支排在前面，于是这句话被当成**立刻执行**的关灯指令——
+    # 用户想加个提醒，灯却当场灭了，提醒还没建出来。
+    # 这是"误执行"，比"漏执行"严重得多：设备动了是看得见的错误，
+    # 漏了最多是没反应。所以只要出现提醒触发词，一律先按日程处理。
+    # 没有时间的情况（"别忘了关灯"）会走 needs_clarify 反问几点，
+    # 宁可多问一句，也不能替用户把设备动了。
+    if has_schedule:
+        return IntentType.SCHEDULE, 0.85
+
     # 疑问词必须压过设备动作：问"空调怎么打开"是在求学，不是在下指令。
     # 这个顺序写反了的代价很实在——疑问句被当祈使句，Agent 会真的去动设备。
     if has_device and has_action and not has_knowledge:
         return IntentType.DEVICE_CONTROL, 0.9
-    if has_schedule:
-        return IntentType.SCHEDULE, 0.85
     if has_knowledge:
         return IntentType.KNOWLEDGE, 0.8
     if has_device:
@@ -256,6 +265,9 @@ class IntentParser:
 - 用户在描述习惯或偏好（"我喜欢""我习惯""记住"）→ type 用 memory_write，不要当成控制指令
 - 用户要求提醒或安排 → type 用 schedule
 - 确实在下指令控制设备 → type 用 device_control
+- **两者都像时一律判 schedule**："提醒我晚上九点关灯"虽然有设备（灯）和动作（关），
+  但它是把动作安排到未来，不是现在执行。判成 device_control 会让灯当场灭掉，
+  属于误执行——宁可判成提醒再反问时间，也不要替用户动设备。
 
 用户输入：{text}"""
 
