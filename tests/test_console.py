@@ -8,6 +8,7 @@
     test_task_complete_and_reopen   → 6.4 完成任务联动设备 + 6.11 撤销
     test_task_cancel_keeps_record   → 6.5 取消不物理删除，留痕可追溯
     test_scene_activate             → 5.4 场景一键联动多个设备
+    test_habits_contract            → 习惯页读的库必须和 AI 写的是同一个
     test_web_assets_served          → 静态站点能被同一条命令托管
 """
 
@@ -129,6 +130,21 @@ def test_scene_activate(client: TestClient) -> None:
     assert res["ok"] is True
     assert len(res["affected"]) >= 2
     assert all(item["ok"] for item in res["affected"])
+
+
+def test_habits_contract(client: TestClient) -> None:
+    """习惯页必须能正常返回，且读的是 AI 写入的同一个记忆库。
+
+    踩过的坑：这个接口原来自己 new 了一个 MemoryService(另一个 db_path)，
+    而 AI 助手写的是默认库——结果"AI 刚记住的习惯，习惯页里一条都查不到"。
+    后来它又因为漏 import 直接 500 了，而当时**没有任何用例覆盖它**，
+    是人在浏览器里点才发现的。所以补这条：接口不许 500，字段不许缺。
+    """
+    res = client.get("/api/console/habits")
+    assert res.status_code == 200, f"习惯页不该 500：{res.text[:200]}"
+    body = res.json()
+    assert "habits" in body and "count" in body
+    assert isinstance(body["habits"], list)
 
 
 def test_web_assets_served(client: TestClient) -> None:

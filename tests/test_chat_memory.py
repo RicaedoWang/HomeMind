@@ -91,7 +91,7 @@ async def test_sessions_isolated_per_member() -> None:
 async def test_logout_clears_member_session(client_factory=None) -> None:
     """登出必须清掉该成员的控制台会话（防止下个登录者问出上一家的事）。"""
     mem = get_short_term_memory()
-    sid = "console:member_001"
+    sid = "console:family_sz:member_001"
     await mem.clear(sid)
     await mem.append(sid, "user", "我要被登出了")
     assert len(await mem.get(sid)) == 1
@@ -138,7 +138,7 @@ async def test_assistant_persists_conversation_history(client: TestClient) -> No
     mock 模式下应答是模板，但"历史有没有被记录和注入"是确定性可断言的。
     """
     mem = get_short_term_memory()
-    sid = "console:member_001"
+    sid = "console:family_sz:member_001"
     await mem.clear(sid)
 
     r1 = client.post("/api/console/assistant", json={"text": "打开客厅灯"})
