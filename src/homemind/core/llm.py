@@ -90,10 +90,16 @@ class LLMClient:
         prompt: str,
         system: str = "",
         temperature: float | None = None,
+        max_tokens: int = 1200,
     ) -> Any | None:
-        """要求模型输出 JSON，并做清洗后解析；失败返回 None。"""
+        """要求模型输出 JSON，并做清洗后解析；失败返回 None。
+
+        max_tokens 必须由调用方按需传入（默认 1200）：选一个 Agent 名字只要几个
+        token，没必要按长文本的额度付钱。这个参数曾经漏在签名外——调用方传了就被
+        TypeError 打死，而且 mock 模式下根本走不到那行，单测抓不到（见 sup-01）。
+        """
         raw = await self.chat(prompt, system=system, temperature=temperature,
-                              max_tokens=1200)
+                              max_tokens=max_tokens)
         if raw is None:
             return None
         return self.parse_json(raw)

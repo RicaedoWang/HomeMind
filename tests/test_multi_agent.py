@@ -16,6 +16,7 @@ from homemind.agents.base import AgentOutcome, BaseAgent
 from homemind.agents.device_agent import DeviceAgent
 from homemind.agents.knowledge_agent import KnowledgeAgent, retrieve
 from homemind.agents.schedule_agent import ScheduleAgent
+from homemind.core.llm import LLMClient
 from homemind.core.models import Intent, IntentType
 from homemind.memory.long_term import LongTermMemory
 from homemind.memory.service import MemoryService
@@ -205,3 +206,67 @@ async def test_multi_graph_end_to_end_device_control(tmp_path):
     assert any(a["agent"] == "device_agent" for a in result.get("agent_assignments", []))
     assert result.get("tool_results"), "应执行了设备控制"
     assert "客厅灯" in result.get("final_answer", "")
+
+
+# ---------------- 真模型兜底路径（sup-01） ----------------
+
+class _RealShapedClient:
+    """假"真模型"客户端：只换掉网络层，chat_json 用**真实实现**。
+
+    为什么必须复用真实的 chat_json：如果这里自己重写一个能接受 max_tokens 的
+    假方法，测的就是假签名——调用方传错参数照样"通过"，等于没测。
+    绑定真实实现后，签名对不上会原样抛 TypeError。
+    """
+
+    def __init__(self, payload: str) -> None:
+        self.payload = payload
+        self.enabled = True
+        self.calls: list[dict] = []
+
+    async def chat(self, prompt, system="", temperature=None, max_tokens=800):
+        self.calls.append({"system": system, "max_tokens": max_tokens})
+        return self.payload
+
+    chat_json = LLMClient.chat_json
+    # 必须包 staticmethod：LLMClient.parse_json 是静态方法，裸赋值成类属性会退化成
+    # 普通函数，通过 self 访问时把 self 也传进去，直接参数个数不符。
+    parse_json = staticmethod(LLMClient.parse_json)
+
+
+async def test_supervisor_llm_fallback_signature_matches_client(monkeypatch):
+    """规则分不出时走模型兜底，且调用实参必须与 LLMClient 签名一致。
+
+    回归自 2026-10-19 真模型实测：supervisor 传了 max_tokens=80，而
+    LLMClient.chat_json 当时没有这个参数 →
+    `TypeError: chat_json() got an unexpected keyword argument 'max_tokens'`，
+    多 Agent 整条链直接 traceback。
+
+    为什么 105 条单测一条都没抓到：mock 模式下 `if not client.enabled` 在
+    调用之前就 return 了，那行代码在强制 mock 的测试里**永远执行不到**。
+    所以这条用例必须显式造一个 enabled=True 的客户端，把那段死代码走通。
+    """
+    from homemind.agents import supervisor as sup_mod
+
+    fake = _RealShapedClient('{"agent": "device_agent"}')
+    monkeypatch.setattr(sup_mod, "get_llm_client", lambda: fake)
+
+    assignments, used_llm = await Supervisor().dispatch_with_llm("把灯弄亮一点吧", [], [])
+
+    assert used_llm is True, "规则没命中时应交给模型判定"
+    assert assignments and assignments[0]["agent"] == "device_agent"
+    assert fake.calls, "应该真的调用了模型"
+    assert fake.calls[0]["max_tokens"] == 80, \
+        "只选一个 Agent 名字，别按长文本的额度烧 token"
+
+
+async def test_supervisor_llm_fallback_survives_garbage_output(monkeypatch):
+    """模型返回垃圾/选了个不存在的 Agent 时，按规则结果走，不硬猜、不抛错。"""
+    from homemind.agents import supervisor as sup_mod
+
+    fake = _RealShapedClient('{"agent": "不存在的Agent"}')
+    monkeypatch.setattr(sup_mod, "get_llm_client", lambda: fake)
+
+    assignments, used_llm = await Supervisor().dispatch_with_llm("嗯嗯啊啊", [], [])
+
+    assert assignments == [], "没有合适的 Agent 就返回空，交给上层降级"
+    assert used_llm is False
