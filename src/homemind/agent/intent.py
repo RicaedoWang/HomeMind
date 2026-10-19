@@ -270,7 +270,10 @@ class IntentParser:
     scheduled_at: ISO8601 时间字符串（如 2026-10-14T09:00:00）
 
 判断要点：
-- 用户想查看 Agent 记住了什么（"我的习惯""记录了什么""看你记录"）→ type 用 memory_query
+- 用户想查看 **Agent 记住的习惯与偏好**（"我的习惯""记录了什么""看你记录"）→ type 用 memory_query
+- 用户想查看 **已安排的提醒/日程/待办**（"查看我的日程""今天有什么安排""我的提醒"）
+  → type 用 schedule，**不要**判成 memory_query。两者都带"我的"，但一个问记忆、一个问日程，
+  判错的后果是：用户问日程，助手却答"你习惯早睡"，答非所问。
 - 用户在描述习惯或偏好（"我喜欢""我习惯""记住"）→ type 用 memory_write，不要当成控制指令
 - 用户要求提醒或安排 → type 用 schedule
 - 确实在下指令控制设备 → type 用 device_control
