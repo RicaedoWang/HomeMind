@@ -122,7 +122,18 @@ function fakeFetch(url, options) {
     }));
   }
   if (pathname === '/api/auth/login') {
-    return Promise.resolve(jsonResponse({ token: 'fake-token', user: { name: '我' } }));
+    return Promise.resolve(jsonResponse({
+      token: 'fake-token',
+      user: { username: 'wo', name: '我', role: 'L4', city: '深圳',
+        family: { id: 'family_sz', name: '深圳的家' } },
+    }));
+  }
+  if (pathname === '/api/auth/register') {
+    return Promise.resolve(jsonResponse({
+      token: 'fake-token',
+      user: { username: 'xinjia', name: '新来的', role: 'L4', city: '杭州',
+        family: { id: 'family_hz', name: '杭州的家' } },
+    }));
   }
   if (pathname === '/api/console/state') return Promise.resolve(jsonResponse(state));
   if (pathname === '/api/console/habits') {
@@ -200,10 +211,6 @@ async function main() {
   // ---- 1. 门禁态：没身份时必须是登录页，而不是白屏
   if (doc.querySelector('#login').hidden) errors.push('门禁失败：无 token 时登录层没显示');
   await tick(60);
-  const acctBtn = doc.querySelector('.hm-login__acct');
-  if (!acctBtn) errors.push('登录页没渲染出演示账号');
-
-  // ---- 2. 登录 → 拉状态
 
   const click = (sel, root = doc) => {
     const el = root.querySelector(sel);
@@ -247,24 +254,72 @@ async function main() {
     if (!ok) errors.push(`点了界面没变化：${label}（${selector}）`);
   }
 
-  // ---- 1.5 注册入口（必须赶在登录之前测：登录完门禁就关了）
-  if (!doc.querySelector('#login-to-register')) {
-    errors.push('登录页没有「创建一个家」入口');
-  } else {
-    await expectUi('注册·打开表单', '#login-to-register',
-      (d) => !d.querySelector('#register-form').hidden, '注册表单出现');
-    await expectUi('注册·切到加入家庭', '#reg-modes .hm-seg__item[data-regmode="join"]',
-      (d) => !d.querySelector('#reg-join-fields').hidden, '邀请码输入框出现');
-    await expectUi('注册·返回登录', '#register-back',
-      (d) => d.querySelector('#register-form').hidden, '回到登录表单');
+  // ---- 1.2 登录页第一屏：上次登录的身份必须真的渲染出来
+  // 以前这里是把四个账号平铺成四行，进门先让人挑——默认动作只能有一个。
+  if (!doc.querySelector('#login-name').textContent.trim()) {
+    errors.push('登录页没渲染出「上次登录的身份」');
+  }
+  if (!doc.querySelector('#login-meta').textContent.includes('深圳的家')) {
+    errors.push('登录页身份卡没显示家庭名');
+  }
+  if (!doc.querySelector('#login-onekey').textContent.trim()) {
+    errors.push('登录页没有一键登录按钮');
   }
 
-  // ---- 2. 登录 → 拉状态
-  acctBtn.click();
-  await tick(150);
+  // ---- 1.4 切换账号下拉
+  await expectUi('切换账号（展开）', '#login-switch',
+    (d) => !d.querySelector('#login-drop').hidden
+      && !!d.querySelector('#login-drop .hm-login__acct'), '下拉列出账号');
+  await expectUi('切换账号（再点收起）', '#login-switch',
+    (d) => d.querySelector('#login-drop').hidden, '下拉收起');
+
+  // 自己注册的账号没有公开密码 → 点它必须退到账密面板并预填用户名，
+  // 而不是像演示账号那样假装能一键进去（进去会静默失败，用户完全不知道为什么）。
+  window.localStorage.setItem('hm_accounts', JSON.stringify([
+    { username: 'selfie', name: '自建房', familyName: '杭州的家', role: 'L4', city: '杭州', demo: false },
+  ]));
+  click('#login-switch');            // 重新展开，这会重读本地记录
+  await tick(50);
+  await expectUi('切换账号·点自建账号', '.hm-login__acct[data-user="selfie"]',
+    (d) => !d.querySelector('#login-sheet').hidden
+      && d.querySelector('#login-user').value === 'selfie', '弹账密面板并预填用户名');
+  click('#login-sheet-close');
+  await tick(40);
+  window.localStorage.removeItem('hm_accounts');   // 清掉，别影响后面「首次登录」的假设
+
+  // ---- 1.45 账密登录面板
+  await expectUi('账密登录（弹出面板）', '#login [data-panel="manual"]',
+    (d) => !d.querySelector('#login-sheet').hidden
+      && !d.querySelector('#login-form').hidden, '账密面板出现');
+  await expectUi('账密面板（关闭）', '#login-sheet-close',
+    (d) => d.querySelector('#login-sheet').hidden, '面板收起');
+
+  // ---- 1.5 注册（必须赶在登录之前测：登录完门禁就关了）
+  await expectUi('注册·打开面板', '#login [data-panel="register"]',
+    (d) => !d.querySelector('#login-sheet').hidden
+      && !d.querySelector('#register-form').hidden
+      && !d.querySelector('#reg-pick').hidden, '弹出且停在选路屏');
+  await expectUi('注册·选「加入已有家庭」', '#reg-pick [data-regmode="join"]',
+    (d) => !d.querySelector('#reg-join-fields').hidden, '邀请码输入框出现');
+  await expectUi('注册·换一种', '#reg-reselect',
+    (d) => !d.querySelector('#reg-pick').hidden, '回到选路屏');
+  await expectUi('注册·关闭面板', '#login-sheet-close',
+    (d) => d.querySelector('#login-sheet').hidden, '面板收起');
+
+  // ---- 2. 一键登录 → 拉状态（登录页的默认动作）
+  const beforeLogin = hits.length;
+  click('#login-onekey');
+  await tick(220);
+  const loginPosted = hits.slice(beforeLogin).some((h) => h.startsWith('POST /api/auth/login'));
+  actions.push(['一键登录', loginPosted ? 'OK → POST /api/auth/login' : '** 没发登录请求 **']);
+  if (!loginPosted) errors.push('一键登录没发请求');
   if (!doc.querySelector('#login').hidden) errors.push('登录后门禁没关掉');
   if (!doc.querySelector('.hm-devicecard')) errors.push('设备卡没渲染');
   if (!doc.querySelector('.hm-taskcard')) errors.push('今日任务卡没渲染');
+  // 登录过的身份要落进本地记录，下次进门才认得出是谁
+  if (!(window.localStorage.getItem('hm_accounts') || '').includes('"username":"wo"')) {
+    errors.push('登录后没记住这次登录的身份');
+  }
 
   // 首页
   await expectRequest('设备开关', '.hm-devicecard .hm-switch');
