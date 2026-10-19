@@ -14,6 +14,30 @@ config.py 的 load_dotenv(override=False) 不会覆盖已存在的环境变量�
 
 import os
 
+import pytest
+
 os.environ["HM_USE_MOCK_LLM"] = "true"
 os.environ.setdefault("HM_REDIS_ENABLED", "false")
 os.environ.setdefault("HM_LOG_LEVEL", "ERROR")
+
+
+@pytest.fixture(autouse=True)
+def _isolated_content_store(tmp_path):
+    """每条用例用独立的内容库。
+
+    家庭与自建场景都是**可写**的（注册会建家、建场景会落库），
+    一旦走默认路径就是 `data/homemind_content.db`——那是用户真实数据。
+    测试写进去等于把人家的家改成测试用例的家，且再也说不清哪条是他自己的。
+
+    和 `auth.set_account_store` 是同一个套路：单例留了接缝，测试就换掉它。
+    """
+    from homemind.auth.family_store import (
+        FamilyStore, SceneStore, set_family_store, set_scene_store,
+    )
+
+    db = str(tmp_path / "content.db")
+    set_family_store(FamilyStore(db))
+    set_scene_store(SceneStore(db))
+    yield
+    set_family_store(None)
+    set_scene_store(None)

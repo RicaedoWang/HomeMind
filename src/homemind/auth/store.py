@@ -9,12 +9,15 @@
 
 from __future__ import annotations
 
+import re
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from ..core.trace import get_logger
+from .family_store import get_family, get_family_store
 from .passwords import hash_password, verify_password
 
 logger = get_logger("auth.store")
@@ -43,6 +46,20 @@ _MAX_ATTEMPTS = 5
 _WINDOW_SECONDS = 60
 
 
+class RegistrationError(Exception):
+    """注册失败。`code` 给调用方映射 HTTP 状态码，`message` 直接显示给用户。
+
+    注册和登录的失败语义刻意不同：登录一律"用户名或密码错误"（防账号枚举），
+    注册必须说清哪一步不对——"用户名已被占用"本来就是用户需要知道的信息，
+    而且注册接口天然是公开的，藏也藏不住。
+    """
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
 @dataclass
 class Account:
     """一个登录账号。"""
@@ -56,7 +73,13 @@ class Account:
     city: str
 
     def to_public_dict(self) -> dict[str, Any]:
-        """对外可见的信息——永远不含密码哈希。"""
+        """对外可见的信息——永远不含密码哈希。
+
+        家庭信息从 family_store 现查，不再读 `FAMILIES` 这张写死的表：
+        用户注册的新家也必须能正常显示名字，否则新用户登录后只看到一个
+        `family_6e532934` 这样的乱码，谁知道这是谁家。
+        """
+        family = get_family(self.family_id)
         return {
             "user_id": self.user_id,
             "username": self.username,
@@ -64,7 +87,8 @@ class Account:
             "name": self.name,
             "role": self.role,
             "city": self.city,
-            "family": FAMILIES.get(self.family_id, {"family_id": self.family_id}),
+            "family": (family.to_dict() if family
+                       else {"family_id": self.family_id, "name": self.family_id}),
         }
 
 
@@ -149,6 +173,117 @@ class AccountStore:
                 "SELECT * FROM user_account ORDER BY family_id, role DESC"
             ).fetchall()
         return [self._row_to_account(r).to_public_dict() for r in rows]
+
+    def accounts_of_family(self, family_id: str) -> list[Account]:
+        """某个家庭的全体成员。家庭成员列表靠它，不再读写死的 FAMILY_MEMBERS。"""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM user_account WHERE family_id=? ORDER BY role DESC, created_at",
+                (family_id,),
+            ).fetchall()
+        return [self._row_to_account(r) for r in rows]
+
+    def register(
+        self,
+        username: str,
+        password: str,
+        name: str,
+        mode: str = "create",
+        family_name: str = "",
+        city: str = "",
+        invite_code: str = "",
+    ) -> Account:
+        """注册。两种模式：
+
+        - `create`：建一个新家庭，注册者是户主（L4），设备按模板初始化
+        - `join`：凭邀请码加入已有家庭，成为普通成员（L3）
+
+        为什么注册必须能建家庭：智能家居产品的第一个用户永远是"给自己家装一套"，
+        不是"加入别人装好的家"。只做邀请码，等于要求用户先有个亲戚。
+        反过来只做建家庭，则多成员共享设备这条路径永远没人走通。
+
+        校验顺序刻意是"先查用户名再建家庭"：反过来一旦用户名重复，
+        库里会留下一个没有任何成员的空家庭——那是不可回收的垃圾数据。
+        """
+        uname = (username or "").strip().lower()
+        if not re.fullmatch(r"[a-z0-9_]{3,20}", uname):
+            raise RegistrationError("invalid_username",
+                                    "用户名只能是 3-20 位字母、数字或下划线")
+        if len(password or "") < 6:
+            raise RegistrationError("weak_password", "密码至少 6 位")
+        display = (name or "").strip()
+        if not display or len(display) > 20:
+            raise RegistrationError("invalid_name", "昵称不能为空，且不超过 20 个字")
+
+        if self.get_by_username(uname) is not None:
+            raise RegistrationError("username_taken", "这个用户名已经被用了")
+
+        if mode == "join":
+            family = get_family_store().get_by_invite(invite_code or "")
+            if family is None:
+                raise RegistrationError("invalid_invite", "邀请码无效，请向家人确认")
+            family_id = family.family_id
+            member_id = self._next_member_id(family_id)
+            role = "L3"
+            city_value = family.city
+        elif mode == "create":
+            family = get_family_store().create(family_name or f"{display}的家", city)
+            family_id = family.family_id
+            member_id = "member_001"
+            role = "L4"
+            city_value = family.city
+        else:
+            raise RegistrationError("invalid_mode", "注册方式只能是创建家庭或加入家庭")
+
+        account = Account(
+            user_id=f"user_{uuid.uuid4().hex[:10]}",
+            family_id=family_id,
+            member_id=member_id,
+            username=uname,
+            role=role,
+            name=display,
+            city=city_value,
+        )
+        try:
+            with self._connect() as conn:
+                conn.execute(
+                    """INSERT INTO user_account
+                       (user_id, family_id, member_id, username, password_hash,
+                        role, name, city, created_at)
+                       VALUES (?,?,?,?,?,?,?,?,?)""",
+                    (account.user_id, account.family_id, account.member_id, uname,
+                     hash_password(password), role, display, city_value, time.time()),
+                )
+        except Exception as exc:  # noqa: BLE001 - UNIQUE 冲突是预期内的
+            # 上面已经查过一次重名，能走到这里基本只有并发抢注。
+            # 不把 sqlite 的原始报错抛给用户（那里面带表名和 SQL）。
+            logger.warning("register insert failed: %s", type(exc).__name__)
+            raise RegistrationError("username_taken", "这个用户名已经被用了") from exc
+
+        logger.info("registered: %s → %s (%s)", uname, family_id, role,
+                    extra={"extra_fields": {"event": "auth.register",
+                                            "family_id": family_id,
+                                            "member_id": member_id,
+                                            "mode": mode}})
+        return account
+
+    def _next_member_id(self, family_id: str) -> str:
+        """家庭内下一个成员编号。取现有最大号 +1，不回收空号。
+
+        不回收是有意的：member_002 退出后把号给新来的人，历史记录（
+        memory 里存的 member_id、消息中心的事件 actor）就会指向另一个人。
+        编号只增不减，脏但不会认错人。
+        """
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT member_id FROM user_account WHERE family_id=?", (family_id,)
+            ).fetchall()
+        numbers = []
+        for row in rows:
+            match = re.fullmatch(r"member_(\d+)", row["member_id"] or "")
+            if match:
+                numbers.append(int(match.group(1)))
+        return f"member_{(max(numbers) + 1 if numbers else 1):03d}"
 
     def is_rate_limited(self, username: str) -> bool:
         """登录失败限流判定。"""

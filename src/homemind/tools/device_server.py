@@ -75,6 +75,11 @@ _INITIAL_DEVICES: dict[str, dict[str, DeviceState]] = {
 }
 
 
+# 内置家庭：设备桶在模块加载时就建好。其它 family_id（用户注册的新家）
+# 一律靠 ensure_family 显式创建——reset_devices 也据此清理测试残留。
+_BUILTIN_FAMILY_IDS: frozenset[str] = frozenset(_DEVICES.keys())
+
+
 def devices_of(family_id: str | None = None) -> dict[str, DeviceState]:
     """取某个家庭的设备桶。未知家庭返回空桶（不自动建，避免脏数据）。"""
     return _DEVICES.get(family_id or DEFAULT_FAMILY_ID, {})
@@ -91,7 +96,17 @@ def _resolve_family(args: dict[str, Any]) -> str:
 
 
 def reset_devices() -> None:
-    """把所有家庭的 Mock 设备状态重置为初始值（评测与测试前置调用）。"""
+    """把所有家庭的 Mock 设备状态重置为初始值（评测与测试前置调用）。
+
+    顺带清掉**测试期间动态注册的家庭桶**：不清理的话，上一条用例注册的
+    "family_1a2b3c4d" 会留在模块级字典里，下一条用例查设备时多出一个家庭，
+    `devices_of("未知家庭")` 返回空桶的断言就可能被前置用例污染。
+    """
+    for family_id in list(_DEVICES):
+        if family_id not in _BUILTIN_FAMILY_IDS:
+            _DEVICES.pop(family_id, None)
+            _INITIAL_DEVICES.pop(family_id, None)
+
     for family_id, snapshot in _INITIAL_DEVICES.items():
         bucket = _DEVICES.setdefault(family_id, {})
         for key, dev in snapshot.items():
@@ -99,6 +114,39 @@ def reset_devices() -> None:
                 device_id=dev.device_id, name=dev.name, room=dev.room,
                 device_type=dev.device_type, power=dev.power, value=dev.value,
             )
+
+
+def ensure_family(family_id: str) -> bool:
+    """给新注册的家庭初始化一套设备（幂等）。返回是否真的新建了。
+
+    刻意**不**写进 devices_of：那个函数的语义是"读"，读的时候顺手建桶会让
+    评测结果不可复现（查一次状态就多一个家庭）。初始化必须是显式动作，
+    由注册流程调用，谁建的、什么时候建的，代码里看得见。
+
+    模板取深圳那套（设备最全的 10 台）。新家"装修"就是把这套设备搬进去，
+    每台都复制成独立对象——直接引用同一份 DeviceState 会让两个家庭互相改状态，
+    这是租户隔离最容易漏的一刀。
+    """
+    if family_id in _DEVICES:
+        return False
+    template = _DEVICES["family_sz"]
+    _DEVICES[family_id] = {
+        key: DeviceState(device_id=d.device_id, name=d.name, room=d.room,
+                         device_type=d.device_type, power=d.power, value=d.value)
+        for key, d in template.items()
+    }
+    # 初始快照也要跟着建，否则 reset_devices() 重置不到这个家庭，
+    # 评测里"注册家庭 → 关灯 → 重置"之后灯还是关的。
+    _INITIAL_DEVICES[family_id] = {
+        key: DeviceState(device_id=d.device_id, name=d.name, room=d.room,
+                         device_type=d.device_type, power=d.power, value=d.value)
+        for key, d in template.items()
+    }
+    logger.info("family devices initialized: %s (%d 台)",
+                family_id, len(_DEVICES[family_id]),
+                extra={"extra_fields": {"event": "device.family_init",
+                                        "family_id": family_id}})
+    return True
 
 
 def _find_device(
