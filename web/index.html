@@ -48,6 +48,8 @@
   <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.5V5"/><path d="m6 11 6-6 6 6"/></symbol>
   <symbol id="i-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v5h-5"/></symbol>
   <symbol id="i-sparkle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l1.5 4.2L17.5 10l-4 1.8L12 16l-1.5-4.2L6.5 10l4-1.8z"/><path d="M18 16.5l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5v13M5.5 12h13"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 4.8 19.2 8.5 9 18.7l-4.4 1.1 1.1-4.4z"/><path d="m13.6 6.7 3.7 3.7"/></symbol>
 </svg>
 
 <!-- ============================ 应用骨架 ============================ -->
@@ -131,7 +133,10 @@
         <section class="hm-section" aria-label="快捷场景">
           <div class="hm-section__head">
             <span class="hm-section__title">快捷场景</span>
-            <span class="hm-section__more">一键联动多个设备</span>
+            <button type="button" class="hm-scene-new is-clickable" id="scene-new">
+              <svg class="hm-ico hm-ico--sm" aria-hidden="true"><use href="#i-plus"/></svg>
+              <span>新建场景</span>
+            </button>
           </div>
           <div class="hm-scenes" id="scenes"></div>
         </section>
@@ -262,6 +267,33 @@
       <input id="login-pass" type="password" placeholder="密码" aria-label="密码" />
       <button type="submit" class="hm-btn hm-btn--primary" id="login-submit">登录</button>
     </form>
+
+    <!-- 注册：两种模式。第一屏刻意只放"创建新家"——第一次用的人一定是给自己家装，
+         不是去加入别人已经装好的家；邀请码那条路留给第二个人。 -->
+    <form id="register-form" autocomplete="off" hidden>
+      <div class="hm-seg" id="reg-modes" role="tablist">
+        <button type="button" class="hm-seg__item is-active" data-regmode="create"
+                role="tab" aria-selected="true">创建新家</button>
+        <button type="button" class="hm-seg__item" data-regmode="join"
+                role="tab" aria-selected="false">加入家庭</button>
+      </div>
+      <input id="reg-name" placeholder="你的昵称（家人看到的名字）" aria-label="昵称" />
+      <input id="reg-user" placeholder="用户名（3-20 位字母或数字）" aria-label="用户名" />
+      <input id="reg-pass" type="password" placeholder="密码（至少 6 位）" aria-label="密码" />
+      <div id="reg-create-fields">
+        <input id="reg-family" placeholder="家庭名称，如「杭州的家」" aria-label="家庭名称" />
+        <input id="reg-city" placeholder="城市，如「杭州」" aria-label="城市" />
+      </div>
+      <div id="reg-join-fields" hidden>
+        <input id="reg-invite" placeholder="6 位邀请码（向户主要）" maxlength="8"
+               aria-label="邀请码" autocomplete="off" />
+      </div>
+      <button type="submit" class="hm-btn hm-btn--primary" id="register-submit">创建并进入</button>
+      <button type="button" class="hm-btn hm-btn--ghost" id="register-back">返回登录</button>
+    </form>
+    <p class="hm-login__error" id="register-error" hidden></p>
+
+    <button type="button" class="hm-login__switch" id="login-to-register">没有账号？创建一个家</button>
     <p class="hm-login__hint">演示密码统一为 <b>demo1234</b></p>
   </div>
 </div>

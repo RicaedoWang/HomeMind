@@ -42,7 +42,8 @@ from .events import (  # noqa: E402
     reset_events,
     unread_count,
 )
-from ..auth.store import FAMILIES
+from ..auth.family_store import VALID_ACTIONS, get_family, get_scene_store
+from .auth import get_account_store
 from ..core.trace import get_logger, new_trace_id, set_trace_id
 from ..memory.service import get_memory_service
 from ..memory.short_term import get_short_term_memory
@@ -59,54 +60,41 @@ WEB_DIR = Path(__file__).resolve().parents[3] / "web"
 
 # ---------------------------------------------------------------- 静态数据
 
-# 家庭成员按租户分桶：小明家只有他一个人，不该看到深圳那三口。
-FAMILY_MEMBERS: dict[str, list[dict[str, Any]]] = {
-    "family_sz": [
-        {"id": "m1", "name": "我", "colorTag": "#4F7BFF", "role": "owner", "avatar": "我"},
-        {"id": "m2", "name": "妈妈", "colorTag": "#F472B6", "role": "admin", "avatar": "妈"},
-        {"id": "m3", "name": "爸爸", "colorTag": "#22D3A8", "role": "member", "avatar": "爸"},
-    ],
-    "family_qd": [
-        {"id": "m101", "name": "小明", "colorTag": "#4F7BFF", "role": "owner", "avatar": "明"},
-    ],
-}
+# 家庭成员不再写死：注册功能一上来，"新加的人不显示"立刻穿帮。
+# 现在从账号表现查——谁注册了谁就在列表里，退出的（将来支持）自然消失。
+_MEMBER_COLORS = ["#4F7BFF", "#F472B6", "#22D3A8", "#FBBF24", "#A78BFA", "#FB923C"]
+_ROLE_LABEL = {"L4": "owner", "L3": "admin", "L2": "member", "L1": "guest"}
 
-# 场景按租户分桶：海边湿冷的家需要"通风"，深圳的家需要"除湿"——
-# 场景清单跟着设备走，拿深圳的设备列表去执行青岛的场景只会全是空转。
-SCENES: dict[str, list[dict[str, Any]]] = {
-    "family_sz": [
-        {"id": "home", "name": "回家", "icon": "home",
-         "actions": [("living_room_light", "turn_on", 60),
-                     ("living_room_curtain", "turn_on", 100)]},
-        {"id": "away", "name": "离家", "icon": "exit",
-         "actions": [("living_room_light", "turn_off", None),
-                     ("living_room_ac", "turn_off", None),
-                     ("living_room_curtain", "turn_off", None)]},
-        {"id": "movie", "name": "观影", "icon": "movie",
-         "actions": [("living_room_light", "set_value", 20),
-                     ("living_room_curtain", "turn_off", None)]},
-        {"id": "sleep", "name": "睡眠", "icon": "moon",
-         "actions": [("living_room_light", "turn_off", None),
-                     ("bedroom_light", "set_value", 8)]},
-        {"id": "wake", "name": "起床", "icon": "sun",
-         "actions": [("bedroom_light", "turn_on", 80),
-                     ("living_room_curtain", "turn_on", 60)]},
-    ],
-    "family_qd": [
-        {"id": "home", "name": "回家", "icon": "home",
-         "actions": [("living_room_light", "turn_on", 60),
-                     ("living_room_heater", "turn_on", None)]},
-        {"id": "away", "name": "离家", "icon": "exit",
-         "actions": [("living_room_light", "turn_off", None),
-                     ("living_room_heater", "turn_off", None)]},
-        {"id": "sleep", "name": "睡眠", "icon": "moon",
-         "actions": [("living_room_light", "turn_off", None),
-                     ("living_room_heater", "set_value", 18)]},
-        {"id": "vent", "name": "通风", "icon": "wind",
-         "actions": [("living_room_fan", "turn_on", None),
-                     ("kitchen_hood", "turn_off", None)]},
-    ],
-}
+
+def _members_payload(family_id: str) -> list[dict[str, Any]]:
+    """本家庭成员。颜色按顺序轮转，保证同一个人每次刷新颜色不变。"""
+    accounts = get_account_store().accounts_of_family(family_id)
+    return [
+        {
+            "id": a.member_id,
+            "memberId": a.member_id,
+            "name": a.name,
+            "colorTag": _MEMBER_COLORS[idx % len(_MEMBER_COLORS)],
+            "role": _ROLE_LABEL.get(a.role, "member"),
+            "avatar": (a.name or "?")[0],
+        }
+        for idx, a in enumerate(accounts)
+    ]
+
+
+def _scenes_payload(family_id: str) -> list[dict[str, Any]]:
+    """本家庭全部场景：内置在前（只读），自建在后（可增删改）。"""
+    return [s.to_dict() for s in get_scene_store().scenes_of(family_id)]
+
+
+def _family_name(family_id: str) -> str:
+    """家庭显示名。查不到就露出 id——宁可难看，也别编一个"我的家"糊弄人。"""
+    family = get_family(family_id)
+    return family.name if family else family_id
+
+# 场景数据已搬到 auth/family_store.py：内置场景在代码里（只读），自建场景落库
+# （可增删改）。搬走的理由——场景从"写死的展示数据"变成了"用户能编辑的内容"，
+# 再当常量摆在 API 模块里，就意味着用户每加一个场景都得改一次代码。
 
 CATEGORY_COLORS = {
     "plant": "#34D399", "laundry": "#60A5FA", "cleaning": "#A78BFA",
@@ -432,16 +420,15 @@ async def console_state(user: AuthUser = Depends(current_user)) -> dict[str, Any
         "pendingCount": len(pending),
         "devices": devices,
         "rooms": sorted({d["room"] for d in devices}),
-        "scenes": [{"id": s["id"], "name": s["name"], "icon": s["icon"]}
-                   for s in SCENES.get(family_id, [])],
+        "scenes": _scenes_payload(family_id),
         "schedules": get_schedules(family_id),
         "energy": _energy_payload(),
         "messages": events_of(family_id),
         "unreadCount": unread_count(family_id),
-        "family": FAMILY_MEMBERS.get(family_id, []),
+        "family": _members_payload(family_id),
         # 身份回显：前端据此显示"谁在看这个家"
         "viewer": {**user.to_dict(),
-                   "familyName": FAMILIES.get(user.family_id, {}).get("name", user.family_id)},
+                   "familyName": _family_name(user.family_id)},
     }
 
 
@@ -548,33 +535,174 @@ async def activate_scene(
     除了空转什么也不会发生。
     """
     family_id = user.family_id
-    scene = next((s for s in SCENES.get(family_id, []) if s["id"] == scene_id), None)
+    scene = get_scene_store().find(family_id, scene_id)
     if scene is None:
         raise HTTPException(status_code=404, detail="场景不存在")
 
     registry = default_registry()
     affected: list[dict[str, Any]] = []
-    for device_id, action, value in scene["actions"]:
+    for item in scene.actions:
+        device_id = str(item.get("device_id", ""))
+        action = str(item.get("action", ""))
+        value = item.get("value")
         device = devices_of(family_id).get(device_id)
         if device is None:
+            # 场景是用户自己建的，设备后来可能被移除（或换了个家）。
+            # 跳过要留痕：否则用户看到"执行成功"，某台设备却没动，
+            # 会以为系统在糊弄他。
+            affected.append({"deviceId": device_id, "name": device_id,
+                             "ok": False, "message": "设备不存在，已跳过"})
             continue
         arguments: dict[str, Any] = {"action": action, "device_name": device.name,
                                      "room": device.room, FAMILY_ARG: family_id}
         if value is not None:
             arguments["value"] = value
         result = await registry.call("device_control", arguments)
+        # `result.ok` 只代表"工具被调用了"，device_control 对不支持的动作
+        # 返回 success=False 但不抛错。只看 ok 会出现"场景说全成功、灯其实没动"。
+        succeeded = result.ok and (result.data or {}).get("success", True)
         affected.append({"deviceId": device_id, "name": device.name,
-                         "ok": result.ok,
+                         "ok": succeeded,
                          "message": (result.data or {}).get("message", "")})
 
     done = [a for a in affected if a["ok"]]
     record_event(
         family_id, TYPE_SCENE,
-        title=f"执行了「{scene['name']}」模式",
+        title=f"执行了「{scene.name}」模式",
         body=f"联动 {len(done)} 台设备：{'、'.join(a['name'] for a in done) or '无'}",
         actor=user.name,
     )
-    return {"ok": True, "scene": scene["name"], "affected": affected}
+    return {"ok": True, "scene": scene.name, "affected": affected}
+
+
+# ---------------------------------------------------------------- 场景自定义
+
+class SceneActionItem(BaseModel):
+    """场景里的一个动作：对哪台设备做什么。"""
+
+    device_id: str = Field(..., description="设备 id（必须是本家庭的设备）")
+    action: str = Field(..., description="turn_on / turn_off / set_value")
+    value: float | None = Field(default=None, description="数值 0-100（亮度/开合/温度）")
+
+
+class SceneUpsertRequest(BaseModel):
+    """新建或修改场景。"""
+
+    name: str = Field(..., description="场景名，如「回家」")
+    icon: str = Field(default="sparkle", description="图标 id")
+    actions: list[SceneActionItem] = Field(default_factory=list)
+
+
+def _validate_actions(family_id: str, actions: list[SceneActionItem]) -> list[dict[str, Any]]:
+    """校验并清洗动作。
+
+    为什么在这里较真：场景是"点一次动好几台设备"的批量操作。里面混进一个
+    别家的设备 id，就等于给用户开了一个绕过单设备租户校验的后门——
+    单设备接口会 403，场景接口却把它当成自己家的设备照做，隔离就漏了。
+    """
+    if not actions:
+        raise HTTPException(status_code=400, detail="场景至少要包含一个动作")
+    if len(actions) > 10:
+        raise HTTPException(status_code=400, detail="一个场景最多 10 个动作")
+
+    bucket = devices_of(family_id)
+    cleaned: list[dict[str, Any]] = []
+    for item in actions:
+        if item.device_id not in bucket:
+            raise HTTPException(status_code=400,
+                                detail=f"设备 {item.device_id} 不属于这个家")
+        if item.action not in VALID_ACTIONS:
+            raise HTTPException(status_code=400, detail=f"不支持的动作 {item.action}")
+
+        value = item.value
+        if value is not None:
+            if not 0 <= float(value) <= 100:
+                raise HTTPException(status_code=400, detail="数值必须在 0-100 之间")
+            value = float(value)
+        cleaned.append({"device_id": item.device_id, "action": item.action, "value": value})
+    return cleaned
+
+
+@router.get("/scenes")
+async def list_scenes(user: AuthUser = Depends(current_user)) -> dict[str, Any]:
+    """本家庭场景清单（含动作明细，编辑器直接用这份数据）。"""
+    return {"scenes": _scenes_payload(user.family_id)}
+
+
+@router.post("/scenes")
+async def create_scene(
+    req: SceneUpsertRequest, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
+    """新建场景。"""
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="场景名不能为空")
+    if len(name) > 12:
+        raise HTTPException(status_code=400, detail="场景名不超过 12 个字")
+
+    actions = _validate_actions(user.family_id, req.actions)
+    scene = get_scene_store().create(user.family_id, name, req.icon, actions)
+
+    record_event(
+        user.family_id, TYPE_SCENE,
+        title=f"新建了「{scene.name}」模式",
+        body=f"包含 {len(actions)} 个动作",
+        actor=user.name,
+    )
+    return {"ok": True, "scene": scene.to_dict()}
+
+
+@router.put("/scenes/{scene_id}")
+async def update_scene(
+    scene_id: str, req: SceneUpsertRequest, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
+    """修改场景。内置场景（回家/离家…）只读，改不了。"""
+    current = get_scene_store().find(user.family_id, scene_id)
+    if current is None:
+        raise HTTPException(status_code=404, detail="场景不存在")
+    if current.builtin:
+        raise HTTPException(status_code=403, detail="内置场景不能修改，可以新建一个自己的")
+
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="场景名不能为空")
+    if len(name) > 12:
+        raise HTTPException(status_code=400, detail="场景名不超过 12 个字")
+
+    actions = _validate_actions(user.family_id, req.actions)
+    scene = get_scene_store().update(
+        user.family_id, scene_id, name=name, icon=req.icon, actions=actions
+    )
+    if scene is None:
+        raise HTTPException(status_code=404, detail="场景不存在")
+
+    record_event(
+        user.family_id, TYPE_SCENE,
+        title=f"修改了「{scene.name}」模式",
+        body=f"现在包含 {len(actions)} 个动作",
+        actor=user.name,
+    )
+    return {"ok": True, "scene": scene.to_dict()}
+
+
+@router.delete("/scenes/{scene_id}")
+async def delete_scene_api(
+    scene_id: str, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
+    """删除自建场景。内置场景删不掉——删光了控制台一片空白，那不叫自由，叫事故。"""
+    current = get_scene_store().find(user.family_id, scene_id)
+    if current is None:
+        raise HTTPException(status_code=404, detail="场景不存在")
+    if current.builtin:
+        raise HTTPException(status_code=403, detail="内置场景不能删除")
+
+    get_scene_store().delete(user.family_id, scene_id)
+    record_event(
+        user.family_id, TYPE_SCENE,
+        title=f"删除了「{current.name}」模式",
+        body="", actor=user.name,
+    )
+    return {"ok": True}
 
 
 class TaskActionRequest(BaseModel):

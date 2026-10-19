@@ -105,7 +105,13 @@
       : { method: verb, headers };
     const res = await fetch(path, options);
     if (res.status === 401) { clearToken(); showLogin('登录态失效，请重新登录'); throw new Error('unauthorized'); }
-    if (!res.ok) throw new Error(`${res.status} ${path}`);
+    if (!res.ok) {
+      // 后端的 detail 是给人看的（"数值必须在 0-100 之间"），比"400 /api/..."有用得多。
+      // 早期版本把状态码直接抛给用户，界面上出现的就是一行 "400 /api/console/scenes"。
+      let detail = '';
+      try { const data = await res.json(); detail = data.detail || data.message || ''; } catch { /* 非 JSON 就算了 */ }
+      throw new Error(detail || `${res.status} ${path}`);
+    }
     return res.json();
   }
 
@@ -113,6 +119,12 @@
   async function showLogin(errorText) {
     const box = $('#login');
     box.hidden = false;
+    // 每次亮出门禁都回到"登录"这一屏：注册到一半失败、或者登录态过期被踢回来，
+    // 都不该让用户停在一个填了一半的注册表单上。
+    $('#login-form').hidden = false;
+    $('#register-form').hidden = true;
+    $('#login-to-register').hidden = false;
+    $('#login-accounts').hidden = false;
     if (errorText) {
       let el = $('#login-error');
       if (!el) {
@@ -550,17 +562,47 @@
   }
 
   // ---------------------------------------------------------- 场景
+  // 场景图标：优先用后端给的 icon，其次按老 id 兜底。
+  // 自建场景的 id 是随机串（scene_1a2b3c4d），靠 id 查表一定查不到。
+  const SCENE_ICON_MAP = { sparkle: 'i-sparkle', home: 'i-home', moon: 'i-moon',
+    sun: 'i-sun', movie: 'i-movie', exit: 'i-exit', drop: 'i-drop' };
+
+  function sceneIconId(s) {
+    return SCENE_ICON_MAP[s.icon] || SCENE_ICON[s.id] || 'i-scene';
+  }
+
   function renderScenes() {
     const box = $('#scenes');
     box.innerHTML = '';
-    store.data.scenes.forEach((s) => {
+    (store.data.scenes || []).forEach((s) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'hm-scene-wrap';
+
       const b = document.createElement('button');
       b.className = 'hm-scene' + (store.activeScene === s.id ? ' is-active' : '');
       b.type = 'button';
-      b.innerHTML = `<span class="hm-scene__icon">${icon(SCENE_ICON[s.id] || 'i-scene', 'hm-ico hm-ico--lg')}</span>`
+      b.dataset.scene = s.id;
+      b.innerHTML = `<span class="hm-scene__icon">${icon(sceneIconId(s), 'hm-ico hm-ico--lg')}</span>`
         + `<span>${esc(s.name)}</span>`;
       b.addEventListener('click', () => activateScene(s.id));
-      box.appendChild(b);
+      wrap.appendChild(b);
+
+      // 只有自建场景给编辑入口。内置场景是演示与回归测试的基线，
+      // 让用户改坏"回家"模式，第二天所有文档和截图全对不上。
+      if (s.editable) {
+        const edit = document.createElement('button');
+        edit.type = 'button';
+        edit.className = 'hm-scene__edit is-clickable';
+        edit.dataset.sceneEdit = s.id;
+        edit.setAttribute('aria-label', `编辑场景 ${s.name}`);
+        edit.innerHTML = icon('i-edit', 'hm-ico hm-ico--sm');
+        edit.addEventListener('click', (e) => {
+          e.stopPropagation();   // 别顺带把场景执行了
+          openSceneEditor(s);
+        });
+        wrap.appendChild(edit);
+      }
+      box.appendChild(wrap);
     });
   }
 
@@ -578,6 +620,165 @@
       setTimeout(() => { store.activeScene = null; renderScenes(); }, 2000);
     }
   }
+
+  // ---------------------------------------------------------- 场景编辑
+
+  const SCENE_ICON_CHOICES = ['sparkle', 'home', 'moon', 'sun', 'movie', 'exit', 'drop'];
+
+  function actionRowHtml(a, devices) {
+    const options = devices.map((d) => `<option value="${esc(d.id)}"${d.id === a.device_id ? ' selected' : ''}>${esc(d.room)} · ${esc(d.name)}</option>`).join('');
+    return `
+      <div class="hm-actionrow">
+        <select class="hm-sel hm-act-device" aria-label="设备">${options}</select>
+        <select class="hm-sel hm-act-action" aria-label="动作">
+          <option value="turn_on"${a.action === 'turn_on' ? ' selected' : ''}>打开</option>
+          <option value="turn_off"${a.action === 'turn_off' ? ' selected' : ''}>关闭</option>
+          <option value="set_value"${a.action === 'set_value' ? ' selected' : ''}>调到</option>
+        </select>
+        <input class="hm-input hm-act-value" type="number" min="0" max="100" step="1"
+               value="${a.value == null ? 60 : a.value}" aria-label="数值" />
+        <button type="button" class="hm-iconbtn hm-act-del" aria-label="删除这个动作">×</button>
+      </div>`;
+  }
+
+  /** 关灯不需要亮度，把数值框禁掉，省得用户以为填了会生效。 */
+  function syncActionRow(row) {
+    const action = row.querySelector('.hm-act-action').value;
+    const input = row.querySelector('.hm-act-value');
+    const off = action === 'turn_off';
+    input.disabled = off;
+    input.title = off ? '关闭动作不需要数值' : '0-100（亮度 / 开合度 / 温度）';
+  }
+
+  function bindActionRow(row) {
+    syncActionRow(row);
+    row.querySelector('.hm-act-action').addEventListener('change', () => syncActionRow(row));
+    row.querySelector('.hm-act-del').addEventListener('click', () => {
+      if ($$('#scene-actions .hm-actionrow').length <= 1) {
+        showToast('至少要留一个动作');
+        return;
+      }
+      row.remove();
+    });
+  }
+
+  function openSceneEditor(scene) {
+    const devices = (store.data && store.data.devices) || [];
+    if (!devices.length) {
+      showToast('这个家还没有设备，没法建场景');
+      return;
+    }
+    const isEdit = !!scene;
+    const draft = isEdit
+      ? JSON.parse(JSON.stringify(scene.actions || []))
+      : [{ device_id: devices[0].id, action: 'turn_on', value: 60 }];
+
+    openFormModal({
+      title: isEdit ? `编辑「${scene.name}」` : '新建场景',
+      okText: isEdit ? '保存' : '创建',
+      html: `
+        <div class="hm-editor">
+          <label class="hm-field">
+            <span class="hm-field__label">场景名</span>
+            <input class="hm-input" id="scene-name" maxlength="12"
+                   value="${esc(isEdit ? scene.name : '')}" placeholder="如「夜读模式」" />
+          </label>
+          <div class="hm-field">
+            <span class="hm-field__label">图标</span>
+            <div class="hm-iconpick" id="scene-icons">
+              ${SCENE_ICON_CHOICES.map((k) => `
+                <button type="button" class="hm-iconpick__item${(isEdit ? scene.icon === k : k === 'sparkle') ? ' is-selected' : ''}"
+                        data-icon="${k}" aria-label="${k}">${icon(SCENE_ICON_MAP[k], 'hm-ico')}</button>`).join('')}
+            </div>
+          </div>
+          <div class="hm-field">
+            <span class="hm-field__label">动作（点一次，同时作用于这些设备）</span>
+            <div id="scene-actions">${draft.map((a) => actionRowHtml(a, devices)).join('')}</div>
+            <button type="button" class="hm-btn hm-btn--ghost hm-btn--sm" id="scene-add-action">＋ 再加一个</button>
+          </div>
+          ${isEdit ? '<button type="button" class="hm-btn hm-btn--danger hm-btn--sm" id="scene-delete">删除这个场景</button>' : ''}
+        </div>`,
+      onSubmit: async () => {
+        const name = $('#scene-name').value.trim();
+        if (!name) { showToast('先给场景起个名字'); return false; }
+        const rows = $$('#scene-actions .hm-actionrow');
+        if (!rows.length) { showToast('至少要有一个动作'); return false; }
+
+        const actions = rows.map((row) => {
+          const action = row.querySelector('.hm-act-action').value;
+          const raw = row.querySelector('.hm-act-value').value;
+          return {
+            device_id: row.querySelector('.hm-act-device').value,
+            action,
+            value: (action === 'turn_off' || raw === '') ? null : Number(raw),
+          };
+        });
+        const picked = $('#scene-icons .hm-iconpick__item.is-selected');
+        try {
+          const path = isEdit ? `/api/console/scenes/${scene.id}` : '/api/console/scenes';
+          await api(path, {
+            name,
+            icon: picked ? picked.dataset.icon : 'sparkle',
+            actions,
+          }, isEdit ? 'PUT' : 'POST');
+          await refresh();
+          showToast(isEdit ? '场景已保存' : '场景已创建');
+          return true;
+        } catch (e) {
+          showToast(e.message || '保存失败');
+          return false;   // 校验失败留在弹窗里，别把用户填的东西关掉
+        }
+      },
+    });
+
+    $$('#scene-actions .hm-actionrow').forEach(bindActionRow);
+
+    $('#scene-add-action').addEventListener('click', () => {
+      if ($$('#scene-actions .hm-actionrow').length >= 10) {
+        showToast('一个场景最多 10 个动作');
+        return;
+      }
+      $('#scene-actions').insertAdjacentHTML('beforeend',
+        actionRowHtml({ device_id: devices[0].id, action: 'turn_on', value: 60 }, devices));
+      bindActionRow($('#scene-actions .hm-actionrow:last-child'));
+    });
+
+    $$('#scene-icons .hm-iconpick__item').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        $$('#scene-icons .hm-iconpick__item').forEach((x) => x.classList.remove('is-selected'));
+        btn.classList.add('is-selected');
+      });
+    });
+
+    if (isEdit) {
+      // 删除做成"点两次"而不是 confirm 弹窗：confirm 会盖在弹窗上面，
+      // 而且 jsdom 里根本没实现，前端冒烟一跑就卡死。
+      let armed = false;
+      const delBtn = $('#scene-delete');
+      delBtn.addEventListener('click', async () => {
+        if (!armed) {
+          armed = true;
+          delBtn.textContent = '再点一次，确认删除';
+          setTimeout(() => {
+            armed = false;
+            const el = $('#scene-delete');
+            if (el) el.textContent = '删除这个场景';
+          }, 4000);
+          return;
+        }
+        try {
+          await api(`/api/console/scenes/${scene.id}`, null, 'DELETE');
+          $('#modal-mask').classList.remove('is-open');
+          await refresh();
+          showToast('场景已删除');
+        } catch (e) {
+          showToast(e.message || '删除失败');
+        }
+      });
+    }
+  }
+
+  $('#scene-new').addEventListener('click', () => openSceneEditor(null));
 
   // ---------------------------------------------------------- 设备
   function deviceCardHtml(d) {
@@ -1337,6 +1538,124 @@
     if (ok) await boot();
   }
   $('#login-form').addEventListener('submit', (e) => { e.preventDefault(); submitLogin(); });
+
+  // ---------------------------------------------------------- 注册
+  // 两种模式共用一张表单：create 建新家（户主 L4），join 凭邀请码加入（成员 L3）。
+  // 第一屏默认 create——第一次用产品的人一定是给自己家装一套，不是去加入别人家。
+  let regMode = 'create';
+
+  function showRegister(show) {
+    $('#login-form').hidden = show;
+    $('#login-accounts').hidden = show;
+    $('#login-to-register').hidden = show;
+    $('#register-form').hidden = !show;
+    $('#register-error').hidden = true;
+    if (show) setTimeout(() => { try { $('#reg-name').focus(); } catch { /* 忽略 */ } }, 30);
+  }
+
+  function setRegMode(mode) {
+    regMode = mode;
+    $$('#reg-modes .hm-seg__item').forEach((b) => {
+      const on = b.dataset.regmode === mode;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    $('#reg-create-fields').hidden = mode !== 'create';
+    $('#reg-join-fields').hidden = mode !== 'join';
+    $('#register-submit').textContent = mode === 'create' ? '创建并进入' : '加入这个家';
+  }
+
+  async function doRegister() {
+    const btn = $('#register-submit');
+    const err = $('#register-error');
+    err.hidden = true;
+    btn.disabled = true;
+    const label = btn.textContent;
+    btn.textContent = '处理中…';
+
+    const body = {
+      username: $('#reg-user').value.trim(),
+      password: $('#reg-pass').value,
+      name: $('#reg-name').value.trim(),
+      mode: regMode,
+      family_name: $('#reg-family').value.trim(),
+      city: $('#reg-city').value.trim(),
+      invite_code: $('#reg-invite').value.trim(),
+    };
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // 后端把"哪一步不对"说得很具体（用户名已占用 / 邀请码无效 / 密码太短），
+        // 直接照搬给用户。自己再编一句"注册失败"只是把有用的信息扔了。
+        err.textContent = data.detail || '注册失败，请检查填写内容';
+        err.hidden = false;
+        btn.disabled = false;
+        btn.textContent = label;
+        return;
+      }
+      setToken(data.token);
+      $('#login').hidden = true;
+      $('#sheet-body').innerHTML = '';
+      $('#sheet-sub').textContent = '意图识别 · 多智能体 · 安全护栏';
+      showRegister(false);
+      await boot();
+      showToast(regMode === 'create' ? '新家建好了，开始布置吧' : '已经加入这个家');
+    } catch {
+      err.textContent = '网络异常，稍后再试';
+      err.hidden = false;
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+  }
+
+  $('#login-to-register').addEventListener('click', () => showRegister(true));
+  $('#register-back').addEventListener('click', () => showRegister(false));
+  $('#register-form').addEventListener('submit', (e) => { e.preventDefault(); doRegister(); });
+  $$('#reg-modes .hm-seg__item').forEach((b) => {
+    b.addEventListener('click', () => setRegMode(b.dataset.regmode));
+  });
+
+  // ---------------------------------------------------------- 通用表单弹窗
+  /**
+   * 带表单的弹窗。和 openModal 的区别：这个允许**校验失败不关闭**——
+   * 填错一个字段就把整个弹窗关掉、让用户重填一遍，是最烦人的交互之一。
+   */
+  function openFormModal({ title, html, okText = '保存', onSubmit }) {
+    $('#modal-title').textContent = title;
+    $('#modal-title').className = 'hm-modal__title';
+    $('#modal-desc').innerHTML = html;
+    $('#modal-chips').hidden = true;
+    $('#modal-chips').innerHTML = '';
+    $('#modal-ok').textContent = okText;
+    $('#modal-ok').className = 'hm-btn hm-btn--primary';
+    $('#modal-ok').disabled = false;
+    $('#modal-cancel').textContent = '取消';
+    $('#modal-mask').classList.add('is-open');
+
+    const close = () => {
+      $('#modal-mask').classList.remove('is-open');
+      $('#modal-ok').onclick = null;
+      $('#modal-cancel').onclick = null;
+    };
+    $('#modal-cancel').onclick = close;
+    $('#modal-ok').onclick = async () => {
+      $('#modal-ok').disabled = true;
+      let keepOpen = false;
+      try {
+        keepOpen = (await onSubmit()) === false;
+      } catch {
+        keepOpen = true;
+      } finally {
+        $('#modal-ok').disabled = false;
+      }
+      if (!keepOpen) close();
+    };
+  }
 
   async function boot() {
     const saved = (() => { try { return localStorage.getItem('hm-theme'); } catch { return null; } })();
