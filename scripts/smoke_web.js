@@ -74,7 +74,15 @@ const state = {
       value: 0, control: 'switch', statusText: '已上锁', online: true, highRisk: true },
   ],
   rooms: ['客厅', '玄关'],
-  scenes: [{ id: 'home', name: '回家', icon: 'home' }, { id: 'away', name: '离家', icon: 'exit' }],
+  scenes: [
+    { id: 'home', name: '回家', icon: 'home', builtin: true, editable: false,
+      actions: [{ device_id: 'living_room_light', action: 'turn_on', value: 60 }] },
+    { id: 'away', name: '离家', icon: 'exit', builtin: true, editable: false,
+      actions: [{ device_id: 'living_room_light', action: 'turn_off', value: null }] },
+    // 自建场景：只有它才带编辑按钮，用来验证"内置不可改、自建可改"这条分界
+    { id: 'scene_smoke01', name: '夜读', icon: 'moon', builtin: false, editable: true,
+      actions: [{ device_id: 'living_room_light', action: 'set_value', value: 15 }] },
+  ],
   schedules: [{ schedule_id: 'sch_0001', content: '关灯睡觉',
     scheduled_at: new Date(Date.now() + 7200e3).toISOString(), status: 'pending' }],
   energy: { today: 3.2, unit: 'kWh', delta: -12, week: 24.6, month: 108.4 },
@@ -196,11 +204,6 @@ async function main() {
   if (!acctBtn) errors.push('登录页没渲染出演示账号');
 
   // ---- 2. 登录 → 拉状态
-  acctBtn.click();
-  await tick(150);
-  if (!doc.querySelector('#login').hidden) errors.push('登录后门禁没关掉');
-  if (!doc.querySelector('.hm-devicecard')) errors.push('设备卡没渲染');
-  if (!doc.querySelector('.hm-taskcard')) errors.push('今日任务卡没渲染');
 
   const click = (sel, root = doc) => {
     const el = root.querySelector(sel);
@@ -244,11 +247,54 @@ async function main() {
     if (!ok) errors.push(`点了界面没变化：${label}（${selector}）`);
   }
 
+  // ---- 1.5 注册入口（必须赶在登录之前测：登录完门禁就关了）
+  if (!doc.querySelector('#login-to-register')) {
+    errors.push('登录页没有「创建一个家」入口');
+  } else {
+    await expectUi('注册·打开表单', '#login-to-register',
+      (d) => !d.querySelector('#register-form').hidden, '注册表单出现');
+    await expectUi('注册·切到加入家庭', '#reg-modes .hm-seg__item[data-regmode="join"]',
+      (d) => !d.querySelector('#reg-join-fields').hidden, '邀请码输入框出现');
+    await expectUi('注册·返回登录', '#register-back',
+      (d) => d.querySelector('#register-form').hidden, '回到登录表单');
+  }
+
+  // ---- 2. 登录 → 拉状态
+  acctBtn.click();
+  await tick(150);
+  if (!doc.querySelector('#login').hidden) errors.push('登录后门禁没关掉');
+  if (!doc.querySelector('.hm-devicecard')) errors.push('设备卡没渲染');
+  if (!doc.querySelector('.hm-taskcard')) errors.push('今日任务卡没渲染');
+
   // 首页
   await expectRequest('设备开关', '.hm-devicecard .hm-switch');
   await expectRequest('设备卡整卡（非开关区域）', '.hm-devicecard__name');
   await expectRequest('房间标题（整屋一键）', '.hm-room-title[data-room]');
   await expectRequest('场景胶囊', '.hm-scene');
+
+  // 场景自定义：新建入口 → 编辑器 → 填名字保存必须真发请求 → 自建场景可编辑
+  await expectUi('场景·新建（打开编辑器）', '#scene-new',
+    (d) => d.querySelector('#modal-mask').classList.contains('is-open')
+      && !!d.querySelector('#scene-name'), '编辑器打开');
+  click('#modal-cancel');
+  await tick(40);
+
+  click('#scene-new');
+  await tick(40);
+  doc.querySelector('#scene-name').value = '冒烟新场景';
+  const beforeSave = hits.length;
+  click('#modal-ok');
+  await tick(150);
+  const posted = hits.slice(beforeSave).some((h) => h.startsWith('POST /api/console/scenes'));
+  actions.push(['场景·保存新场景', posted ? 'OK → POST /api/console/scenes' : '** 没发请求 **']);
+  if (!posted) errors.push('新建场景点了保存却没发请求');
+
+  await expectUi('场景·编辑自建场景', '.hm-scene__edit',
+    (d) => d.querySelector('#modal-mask').classList.contains('is-open')
+      && d.querySelector('#scene-name').value === '夜读', '带出原场景名「夜读」');
+  click('#modal-cancel');
+  await tick(40);
+
   await expectRequest('舒适度提示按钮', '#hint-action');
   // 消息条目必须排在"一键已读"前面：全标已读之后，点单条本就不该再发请求
   await expectRequest('消息条目（标已读）', '.hm-msgitem[data-msg]');

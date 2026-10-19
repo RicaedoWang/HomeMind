@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import socket
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -41,6 +42,24 @@ import uvicorn  # noqa: E402
 from homemind.api.main import app  # noqa: E402
 
 MODE = "真模型" if "--real" in sys.argv else "mock 模型"
+
+# 验收会**注册真实账号、建真实家庭**，这些都会落 SQLite。不隔离的话每跑一次
+# 就往用户的账号表里塞两个测试用户，跑十次就是二十个——和"复现时污染记忆库"
+# 是同一类事故，只是这次脏的是账号表。
+_TMP_DIR = Path(tempfile.mkdtemp(prefix="hm-verify-"))
+
+
+def isolate_stores() -> None:
+    """把账号库、家庭库、场景库都换成临时文件（必须在起服务之前调用）。"""
+    from homemind.api.auth import set_account_store
+    from homemind.auth.family_store import (
+        FamilyStore, SceneStore, set_family_store, set_scene_store,
+    )
+    from homemind.auth.store import AccountStore
+
+    set_account_store(AccountStore(db_path=str(_TMP_DIR / "accounts.db")))
+    set_family_store(FamilyStore(str(_TMP_DIR / "content.db")))
+    set_scene_store(SceneStore(str(_TMP_DIR / "content.db")))
 
 
 def free_port() -> int:
@@ -87,6 +106,7 @@ def titles(messages: list[dict]) -> list[str]:
 
 
 def main() -> int:
+    isolate_stores()      # 必须在任何请求打到服务之前换库
     port = free_port()
     base = f"http://127.0.0.1:{port}"
     config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error")
@@ -202,6 +222,99 @@ def main() -> int:
         r = xm.post("/api/console/messages/evt_0001/read", {})
         check("读别家的消息 → 404", r.status_code == 404,
               f"小明 POST /messages/evt_0001/read → {r.status_code}")
+
+        # ---- 注册：建新家 + 邀请码加入 ----
+        fresh = Client(base)
+        reg = fresh._c.post("/api/auth/register", json={
+            "username": "e2e_owner", "password": "pass1234", "name": "端到端户主",
+            "mode": "create", "family_name": "端到端的家", "city": "成都",
+        })
+        check("注册即建家（L4 户主）",
+              reg.status_code == 200 and reg.json()["user"]["role"] == "L4",
+              f"POST /auth/register → {reg.status_code}")
+        fresh.token = reg.json()["token"]
+        fresh._c.headers["Authorization"] = f"Bearer {fresh.token}"
+        fresh_family = reg.json()["user"]["family"]["family_id"]
+
+        st = fresh.state()
+        check("新家有设备（不是空控制台）",
+              len(st["devices"]) > 0, f"{len(st['devices'])} 台设备")
+        check("新家成员列表只有自己",
+              [m["name"] for m in st["family"]] == ["端到端户主"],
+              str([m["name"] for m in st["family"]]))
+
+        inv = fresh.get("/api/auth/family/invite")
+        check("户主能看邀请码", inv.status_code == 200,
+              f"邀请码 {inv.json().get('inviteCode', '无')}")
+        invite_code = inv.json().get("inviteCode", "")
+
+        mate = Client(base)
+        mate_reg = mate._c.post("/api/auth/register", json={
+            "username": "e2e_mate", "password": "pass1234", "name": "端到端家人",
+            "mode": "join", "invite_code": invite_code,
+        })
+        mate_ok = mate_reg.status_code == 200
+        if mate_ok:
+            mate.token = mate_reg.json()["token"]
+            mate._c.headers["Authorization"] = f"Bearer {mate.token}"
+        check("邀请码加入同一个家（L3 成员）",
+              mate_ok and mate_reg.json()["user"]["family"]["family_id"] == fresh_family
+              and mate_reg.json()["user"]["role"] == "L3",
+              f"member {mate_reg.json()['user']['member_id']}" if mate_ok else "注册失败")
+
+        r = mate.get("/api/auth/family/invite")
+        check("成员看不到邀请码 → 403", r.status_code == 403,
+              f"POST /auth/family/invite → {r.status_code}")
+
+        st = fresh.state()
+        check("新成员出现在家庭列表里",
+              "端到端家人" in [m["name"] for m in st["family"]],
+              str([m["name"] for m in st["family"]]))
+
+        # ---- 场景自定义：增删改 + 真执行 ----
+        created = fresh.post("/api/console/scenes", {
+            "name": "端到端夜读", "icon": "moon",
+            "actions": [{"device_id": "bedroom_light", "action": "set_value", "value": 12}],
+        })
+        scene_ok = created.status_code == 200
+        scene = created.json()["scene"] if scene_ok else {}
+        check("新建场景", scene_ok and scene.get("builtin") is False,
+              f"POST /scenes → {created.status_code}")
+
+        if scene_ok:
+            act = fresh.post(f"/api/console/scenes/{scene['id']}/activate")
+            light = next((d for d in fresh.state()["devices"]
+                          if d["id"] == "bedroom_light"), {})
+            check("新场景真能执行（数值落到设备）",
+                  act.status_code == 200 and light.get("value") == 12,
+                  f"主卧灯 → {light.get('power')} / {light.get('value')}")
+
+            upd = fresh._c.put(f"/api/console/scenes/{scene['id']}", json={
+                "name": "端到端改名", "icon": "sun",
+                "actions": [{"device_id": "bedroom_light", "action": "turn_off", "value": None}],
+            })
+            names = [s["name"] for s in fresh.get("/api/console/scenes").json()["scenes"]]
+            check("场景改名生效", upd.status_code == 200 and "端到端改名" in names,
+                  f"PUT /scenes → {upd.status_code}")
+
+            r = fresh.delete("/api/console/scenes/home")
+            check("内置场景删不掉 → 403", r.status_code == 403,
+                  f"DELETE /scenes/home → {r.status_code}")
+
+            r = fresh.post("/api/console/scenes", {
+                "name": "偷别家设备", "icon": "moon",
+                "actions": [{"device_id": "living_room_heater", "action": "turn_on"}],
+            })
+            check("用别家设备建场景 → 400", r.status_code == 400,
+                  f"青岛地暖 → {r.status_code}")
+
+            r = xm.delete(f"/api/console/scenes/{scene['id']}")
+            check("删别家的场景 → 404", r.status_code == 404,
+                  f"小明 DELETE → {r.status_code}")
+
+            fresh.delete(f"/api/console/scenes/{scene['id']}")
+            names = [s["name"] for s in fresh.get("/api/console/scenes").json()["scenes"]]
+            check("自建场景能删除", "端到端改名" not in names, f"剩余 {len(names)} 个")
     finally:
         server.should_exit = True
 
