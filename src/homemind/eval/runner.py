@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -23,6 +24,16 @@ from ..agents.graph import build_multi_agent_graph
 from ..memory.long_term import LongTermMemory
 from ..memory.service import MemoryService
 from ..tools.calendar_server import reset_schedules
+
+# 应答关键词比较前要剥掉的噪声：空白、连接词"的"、各种标点。
+# 为什么要剥：真模型把"客厅灯"写成"客厅的灯"是文笔，不是故障。
+# 只剥连接词，房间名与设备名仍须原样出现，"把卧室灯关掉"这种真错照样报出来。
+_NOISE = re.compile(r"[\s的，。！？、,.!?：:；;“”\"'（）()]")
+
+
+def _norm(text: str) -> str:
+    """归一化后用于关键词粗匹配（见 _NOISE 的说明）。"""
+    return _NOISE.sub("", text or "")
 from ..tools.device_server import reset_devices
 from .cases import EvalCase, get_dataset
 
@@ -218,7 +229,10 @@ def _check(case: EvalCase, result: dict[str, Any]) -> tuple[list[str], dict[str,
         failures.append("未触发二次确认，但该场景必须确认")
 
     for keyword in case.expect_answer_contains:
-        if keyword not in answer:
+        # 归一化后比较：真模型是自由生成的，"客厅灯"会被写成"客厅的灯"。
+        # 工具、意图、分派全对，只是多了一个"的"，判失败等于在考模型文笔。
+        # 只去掉连接词和标点，房间名/设备名仍须原样出现——"关错房间"照样抓得住。
+        if _norm(keyword) not in _norm(answer):
             failures.append(f"应答缺少关键词「{keyword}」，实际：{answer[:60]}")
 
     actual = {
