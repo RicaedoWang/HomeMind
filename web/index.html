@@ -254,47 +254,147 @@
 </section>
 
 <!-- ============================ 登录门禁 ============================ -->
+<!--
+  极简登录页，三层结构：
+    1. 主屏：只放"上次登录的那个身份" + 一键登录 + 切换账号下拉。
+       以前把四个账号平铺成四行、底下再挂一张账密表单、再挂一张注册表单，
+       一屏塞三种入口——用户站在门口不知道该点哪个。默认动作只能有一个。
+    2. 底部三个入口：账密登录 / 注册账号 / 帮助。前两个是"换一种方式进来"，
+       都是次选动作，所以压到最下面做成小图标按钮。
+    3. 弹出面板：账密、注册、帮助各一屏。注册进去先让人选"创建还是加入"，
+       不选就没法给出正确的表单字段——这两条路要填的东西根本不一样。
+-->
 <div class="hm-login" id="login" hidden>
   <div class="hm-login__card">
     <div class="hm-login__brand">
       <svg class="hm-ico hm-ico--lg" style="color:var(--hm-color-brand)"><use href="#i-sparkle"/></svg>
       HomeMind
     </div>
-    <p class="hm-login__sub">选择一个家庭身份登录 · 不同家庭的数据完全隔离</p>
-    <div class="hm-login__accounts" id="login-accounts"></div>
-    <form id="login-form" autocomplete="off">
-      <input id="login-user" placeholder="用户名" aria-label="用户名" />
-      <input id="login-pass" type="password" placeholder="密码" aria-label="密码" />
-      <button type="submit" class="hm-btn hm-btn--primary" id="login-submit">登录</button>
-    </form>
+    <p class="hm-login__sub">智能家居控制台 · 每个家庭的数据完全隔离</p>
 
-    <!-- 注册：两种模式。第一屏刻意只放"创建新家"——第一次用的人一定是给自己家装，
-         不是去加入别人已经装好的家；邀请码那条路留给第二个人。 -->
-    <form id="register-form" autocomplete="off" hidden>
-      <div class="hm-seg" id="reg-modes" role="tablist">
-        <button type="button" class="hm-seg__item is-active" data-regmode="create"
-                role="tab" aria-selected="true">创建新家</button>
-        <button type="button" class="hm-seg__item" data-regmode="join"
-                role="tab" aria-selected="false">加入家庭</button>
+    <!-- 上次登录的身份：整张卡的主角 -->
+    <div class="hm-login__hero" id="login-hero">
+      <div class="hm-login__avatar" id="login-avatar">我</div>
+      <div class="hm-login__who">
+        <div class="hm-login__name" id="login-name">—</div>
+        <div class="hm-login__meta" id="login-meta">正在读取登录记录…</div>
       </div>
-      <input id="reg-name" placeholder="你的昵称（家人看到的名字）" aria-label="昵称" />
-      <input id="reg-user" placeholder="用户名（3-20 位字母或数字）" aria-label="用户名" />
-      <input id="reg-pass" type="password" placeholder="密码（至少 6 位）" aria-label="密码" />
-      <div id="reg-create-fields">
-        <input id="reg-family" placeholder="家庭名称，如「杭州的家」" aria-label="家庭名称" />
-        <input id="reg-city" placeholder="城市，如「杭州」" aria-label="城市" />
-      </div>
-      <div id="reg-join-fields" hidden>
-        <input id="reg-invite" placeholder="6 位邀请码（向户主要）" maxlength="8"
-               aria-label="邀请码" autocomplete="off" />
-      </div>
-      <button type="submit" class="hm-btn hm-btn--primary" id="register-submit">创建并进入</button>
-      <button type="button" class="hm-btn hm-btn--ghost" id="register-back">返回登录</button>
-    </form>
-    <p class="hm-login__error" id="register-error" hidden></p>
+      <button type="button" class="hm-login__switch" id="login-switch"
+              aria-expanded="false" aria-controls="login-drop">
+        切换账号
+        <svg class="hm-ico hm-ico--sm"><use href="#i-chevron-down"/></svg>
+      </button>
 
-    <button type="button" class="hm-login__switch" id="login-to-register">没有账号？创建一个家</button>
-    <p class="hm-login__hint">演示密码统一为 <b>demo1234</b></p>
+      <!-- 下拉：最近登录过的身份 + 其他演示账号 -->
+      <div class="hm-login__drop" id="login-drop" hidden>
+        <p class="hm-login__drop-label">最近登录</p>
+        <div class="hm-login__drop-list" id="login-history"></div>
+        <p class="hm-login__drop-label">其他演示账号</p>
+        <div class="hm-login__drop-list" id="login-demo"></div>
+        <button type="button" class="hm-login__drop-add" data-panel="register">
+          <svg class="hm-ico hm-ico--sm"><use href="#i-plus"/></svg>
+          注册一个新账号
+        </button>
+      </div>
+    </div>
+
+    <button type="button" class="hm-btn hm-btn--primary hm-login__onekey" id="login-onekey">一键登录</button>
+    <p class="hm-login__error" id="login-error" hidden></p>
+
+    <div class="hm-login__foot">
+      <button type="button" class="hm-login__footbtn" data-panel="manual">
+        <span class="hm-login__footicon"><svg class="hm-ico"><use href="#i-user"/></svg></span>
+        账密登录
+      </button>
+      <button type="button" class="hm-login__footbtn" data-panel="register">
+        <span class="hm-login__footicon"><svg class="hm-ico"><use href="#i-plus"/></svg></span>
+        注册账号
+      </button>
+      <button type="button" class="hm-login__footbtn" data-panel="help">
+        <span class="hm-login__footicon"><svg class="hm-ico"><use href="#i-robot"/></svg></span>
+        帮助
+      </button>
+    </div>
+  </div>
+
+  <!-- 弹出面板：三块内容共用一层，从下往上滑入 -->
+  <div class="hm-login__sheet" id="login-sheet" hidden>
+    <div class="hm-login__sheet-card" role="dialog" aria-modal="true" aria-labelledby="login-sheet-title">
+      <div class="hm-login__sheet-head">
+        <span class="hm-login__sheet-title" id="login-sheet-title">账号密码登录</span>
+        <button type="button" class="hm-login__sheet-x" id="login-sheet-close" aria-label="关闭">
+          <svg class="hm-ico hm-ico--sm"><use href="#i-close"/></svg>
+        </button>
+      </div>
+
+      <!-- 面板 1：账密登录 -->
+      <form class="hm-login__pane" id="login-form" data-pane="manual" autocomplete="off">
+        <input id="login-user" placeholder="用户名" aria-label="用户名" />
+        <input id="login-pass" type="password" placeholder="密码" aria-label="密码" />
+        <button type="submit" class="hm-btn hm-btn--primary" id="login-submit">登录</button>
+      </form>
+
+      <!-- 面板 2：注册。先选路（创建 / 加入），再填对应表单 -->
+      <form class="hm-login__pane" id="register-form" data-pane="register" hidden autocomplete="off">
+        <div class="hm-regpick" id="reg-pick">
+          <button type="button" class="hm-regpick__card" data-regmode="create">
+            <span class="hm-regpick__icon"><svg class="hm-ico hm-ico--lg"><use href="#i-home"/></svg></span>
+            <span class="hm-regpick__text">
+              <span class="hm-regpick__t">创建新家庭</span>
+              <span class="hm-regpick__d">你是户主 L4，从零开始，10 台设备自动初始化</span>
+            </span>
+            <svg class="hm-ico hm-ico--sm hm-regpick__arrow"><use href="#i-chevron-right"/></svg>
+          </button>
+          <button type="button" class="hm-regpick__card" data-regmode="join">
+            <span class="hm-regpick__icon"><svg class="hm-ico hm-ico--lg"><use href="#i-user"/></svg></span>
+            <span class="hm-regpick__text">
+              <span class="hm-regpick__t">加入已有家庭</span>
+              <span class="hm-regpick__d">凭 6 位邀请码进去，成为 L3 成员，共用设备</span>
+            </span>
+            <svg class="hm-ico hm-ico--sm hm-regpick__arrow"><use href="#i-chevron-right"/></svg>
+          </button>
+        </div>
+
+        <div class="hm-regfields" id="reg-fields" hidden>
+          <div class="hm-regfields__head">
+            <span id="reg-mode-label">创建新家庭</span>
+            <button type="button" class="hm-login__link" id="reg-reselect">换一种</button>
+          </div>
+          <input id="reg-name" placeholder="你的昵称（家人看到的名字）" aria-label="昵称" />
+          <input id="reg-user" placeholder="用户名（3-20 位字母或数字）" aria-label="用户名" />
+          <input id="reg-pass" type="password" placeholder="密码（至少 6 位）" aria-label="密码" />
+          <div id="reg-create-fields">
+            <input id="reg-family" placeholder="家庭名称，如「杭州的家」" aria-label="家庭名称" />
+            <input id="reg-city" placeholder="城市，如「杭州」" aria-label="城市" />
+          </div>
+          <div id="reg-join-fields" hidden>
+            <input id="reg-invite" placeholder="6 位邀请码（向户主要）" maxlength="8"
+                   aria-label="邀请码" autocomplete="off" />
+          </div>
+          <button type="submit" class="hm-btn hm-btn--primary" id="register-submit">创建并进入</button>
+        </div>
+      </form>
+
+      <!-- 面板 3：帮助 -->
+      <div class="hm-login__pane" id="login-help" data-pane="help" hidden>
+        <dl class="hm-help">
+          <dt>演示密码</dt>
+          <dd>四个内置账号统一为 <code>demo1234</code>。一键登录用的就是它。</dd>
+          <dt>一键登录为什么有时要密码</dt>
+          <dd>内置演示账号的密码是公开的，可以一键进入；<b>你自己注册的账号</b>密码只有你知道，
+              所以会跳到账密面板让你输入。前端不保存任何密码。</dd>
+          <dt>登录记录存在哪</dt>
+          <dd>只存在这台设备的浏览器本地（localStorage），记录的是昵称、家庭、角色这类展示信息，
+              不包含密码。清除浏览器数据就没了。</dd>
+          <dt>数据隔离</dt>
+          <dd>租户 = 家庭。同一个家的成员共享设备与任务；不同家庭的设备、消息、日程、
+              习惯记忆完全分开，跨家庭访问一律 403。</dd>
+        </dl>
+        <p class="hm-login__hint">想从头体验，点「注册账号 → 创建新家庭」，会给你一套全新的 10 台设备。</p>
+      </div>
+
+      <p class="hm-login__error" id="login-sheet-error" hidden></p>
+    </div>
   </div>
 </div>
 

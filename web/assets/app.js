@@ -90,10 +90,43 @@
 
   // ---------------------------------------------------------- 登录态
   const TOKEN_KEY = 'hm_token';
+  // 登录过的身份。只存昵称/家庭/角色这类**展示信息**，绝不存密码——
+  // token 失效后重来一遍，靠的是"知道该点谁"，不是"替用户记住密码"。
+  const HISTORY_KEY = 'hm_accounts';
+  const HISTORY_MAX = 5;
 
   function getToken() { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } }
   function setToken(t) { try { localStorage.setItem(TOKEN_KEY, t); } catch { /* 隐私模式忽略 */ } }
   function clearToken() { try { localStorage.removeItem(TOKEN_KEY); } catch { /* 同上 */ } }
+
+  function readHistory() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+      return Array.isArray(raw) ? raw.filter((a) => a && a.username) : [];
+    } catch { return []; }
+  }
+  function writeHistory(list) {
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, HISTORY_MAX))); }
+    catch { /* 隐私模式忽略 */ }
+  }
+  /** 记一次登录。同一个人重复登录只留最新一条，并且排到最前面（QQ 的就是这个行为）。 */
+  function rememberAccount(identity) {
+    if (!identity || !identity.username) return;
+    writeHistory([identity].concat(readHistory().filter((a) => a.username !== identity.username)));
+  }
+
+  /** 把后端两种来源（演示账号清单 / 登录返回的 user）统一成同一种身份对象。 */
+  function toIdentity(u, demo) {
+    const src = u || {};
+    return {
+      username: src.username || '',
+      name: src.name || src.username || '',
+      familyName: (src.family && src.family.name) || src.familyName || '未知家庭',
+      role: src.role || '',
+      city: src.city || '',
+      demo: !!demo,
+    };
+  }
 
   async function api(path, body, method) {
     const headers = { 'Content-Type': 'application/json' };
@@ -115,46 +148,115 @@
     return res.json();
   }
 
-  /** 显示登录门禁。没有有效身份时，控制台一个数据都拿不到。 */
-  async function showLogin(errorText) {
-    const box = $('#login');
-    box.hidden = false;
-    // 每次亮出门禁都回到"登录"这一屏：注册到一半失败、或者登录态过期被踢回来，
-    // 都不该让用户停在一个填了一半的注册表单上。
-    $('#login-form').hidden = false;
-    $('#register-form').hidden = true;
-    $('#login-to-register').hidden = false;
-    $('#login-accounts').hidden = false;
-    if (errorText) {
-      let el = $('#login-error');
-      if (!el) {
-        el = document.createElement('p');
-        el.id = 'login-error';
-        el.className = 'hm-login__error';
-        $('#login-form').after(el);
-      }
-      el.textContent = errorText;
+  // ---------------------------------------------------------- 登录页
+  // 一屏只留一个默认动作。以前四个账号平铺 + 账密表单 + 注册表单全堆在一屏，
+  // 站在门口的人根本不知道该点哪儿。现在：上次那个身份 ⇒ 一键登录 ⇒ 切换/注册/账密都在次选位置。
+  let demoAccounts = [];   // /api/auth/accounts 的内置演示账号（生产环境该接口 404）
+
+  function isDemoUser(username) {
+    return demoAccounts.some((a) => a.username === username);
+  }
+
+  /** 门口那个人是谁：优先"上次登录的"，第一次来就用第一个演示账号。 */
+  function currentIdentity() {
+    const hist = readHistory();
+    if (hist.length) return hist[0];
+    return demoAccounts.length ? toIdentity(demoAccounts[0], true) : null;
+  }
+
+  function setLoginError(text) {
+    const el = $('#login-error');
+    if (!el) return;
+    el.textContent = text || '';
+    el.hidden = !text;
+  }
+  function setSheetError(text) {
+    const el = $('#login-sheet-error');
+    if (!el) return;
+    el.textContent = text || '';
+    el.hidden = !text;
+  }
+
+  function renderLoginHero() {
+    const who = currentIdentity();
+    const avatar = $('#login-avatar');
+    const meta = $('#login-meta');
+    const btn = $('#login-onekey');
+    if (!who) {
+      avatar.textContent = '?';
+      avatar.style.background = 'var(--hm-bg-sunken)';
+      $('#login-name').textContent = '还没有身份';
+      meta.textContent = '注册一个家，或者用演示账号登录';
+      btn.textContent = '注册账号';
+      return;
     }
+    avatar.textContent = (who.name || who.username || '?').slice(0, 1);
+    // 户主用品牌渐变、成员用中性灰——进门前就能看出这人有没有管理权
+    avatar.style.background = who.role === 'L4'
+      ? 'linear-gradient(135deg, var(--hm-color-brand), var(--hm-color-accent))'
+      : 'linear-gradient(135deg, #6B7280, #9CA3AF)';
+    $('#login-name').textContent = who.name || who.username;
+    meta.textContent = [who.familyName, who.role, who.city].filter(Boolean).join(' · ');
+    btn.textContent = who.demo ? '一键登录' : '登录';
+  }
+
+  function acctHtml(a) {
+    const bg = a.role === 'L4' ? 'var(--hm-color-brand)' : 'var(--hm-text-tertiary)';
+    return `<button type="button" class="hm-login__acct" data-user="${esc(a.username)}" data-demo="${a.demo ? '1' : '0'}">
+        <span class="hm-login__acct-avatar" style="background:${bg}">${esc((a.name || a.username).slice(0, 1))}</span>
+        <span class="hm-login__acct-body">
+          <span class="hm-login__acct-name">${esc(a.name || a.username)}<em>${esc(a.role)}</em></span>
+          <span class="hm-login__acct-meta">${esc(a.familyName)} · ${esc(a.username)}</span>
+        </span>
+        ${icon('i-chevron-right', 'hm-ico hm-ico--sm')}
+      </button>`;
+  }
+
+  function renderLoginDrop() {
+    const hist = readHistory();
+    $('#login-history').innerHTML = hist.length
+      ? hist.map(acctHtml).join('')
+      : '<p class="hm-login__empty">这台设备还没登录过，下面是内置演示账号。</p>';
+
+    const pool = demoAccounts.map((a) => toIdentity(a, true));
+    const others = pool.filter((a) => !hist.some((h) => h.username === a.username));
+    $('#login-demo').innerHTML = others.length
+      ? others.map(acctHtml).join('')
+      : '<p class="hm-login__empty">演示账号都已在上面了。</p>';
+
+    // 点谁就登谁：演示账号密码是公开的（demo1234）可以直接进；
+    // 自己注册的账号密码只有本人知道，所以退到账密面板、把用户名填好。
+    $$('#login-drop .hm-login__acct').forEach((b) => {
+      b.addEventListener('click', () => {
+        const who = hist.concat(pool).find((a) => a.username === b.dataset.user)
+          || { username: b.dataset.user, demo: b.dataset.demo === '1' };
+        toggleLoginDrop(false);
+        if (who.demo) oneKeyLogin(who);
+        else openManualWith(who.username);
+      });
+    });
+  }
+
+  function toggleLoginDrop(open) {
+    const drop = $('#login-drop');
+    if (!drop) return;
+    const next = open === undefined ? drop.hidden : !!open;
+    drop.hidden = !next;
+    $('#login-switch').setAttribute('aria-expanded', next ? 'true' : 'false');
+    if (next) renderLoginDrop();
+  }
+
+  async function showLogin(errorText) {
+    $('#login').hidden = false;
+    closeLoginSheet();
+    toggleLoginDrop(false);
+    setLoginError(errorText || '');
+    // 每次亮门禁都重读演示账号：注册完再登出，清单和"上次登录的人"都变了
     try {
       const res = await fetch('/api/auth/accounts');
-      const list = (await res.json()).accounts || [];
-      $('#login-accounts').innerHTML = list.map((a) => `
-        <button type="button" class="hm-login__acct" data-user="${esc(a.username)}">
-          <span class="hm-avatar" style="background:${a.role === 'L4' ? 'var(--hm-color-brand)' : 'var(--hm-text-tertiary)'}">${esc(a.name.slice(0, 1))}</span>
-          <div class="hm-listitem__body">
-            <div class="hm-listitem__title">${esc(a.name)} · ${esc(a.family.name)}</div>
-            <div class="hm-listitem__desc">${esc(a.username)} · ${esc(a.city)} · ${esc(a.role)}</div>
-          </div>
-          ${icon('i-chevron-right', 'hm-ico hm-ico--sm')}
-        </button>`).join('');
-      $$('.hm-login__acct').forEach((b) => {
-        b.addEventListener('click', () => {
-          $('#login-user').value = b.dataset.user;
-          $('#login-pass').value = 'demo1234';
-          submitLogin();     // 不用 requestSubmit：老 Safari 不支持，jsdom 也没实现
-        });
-      });
-    } catch { /* 拿不到清单就手填，不阻塞登录 */ }
+      demoAccounts = (await res.json()).accounts || [];
+    } catch { demoAccounts = []; }
+    renderLoginHero();
   }
 
   async function doLogin(username, password) {
@@ -164,15 +266,71 @@
       body: JSON.stringify({ username, password }),
     });
     if (!res.ok) {
-      showLogin('用户名或密码错误');
+      // 失败时**别关面板**：关了就得从头再填一遍，是最烦人的交互之一。
+      setSheetError('用户名或密码错误');
+      setLoginError('用户名或密码错误');
       return false;
     }
-    setToken((await res.json()).token);
+    const data = await res.json();
+    setToken(data.token);
+    const name = (data.user && data.user.username) || username;
+    rememberAccount(toIdentity(data.user || { username }, isDemoUser(name)));
+    enterConsole();
+    return true;
+  }
+
+  /** 通过门禁后的统一收尾：关掉登录层、抹掉上一个人的对话痕迹。 */
+  function enterConsole() {
     $('#login').hidden = true;
+    closeLoginSheet();
     // 换账号 = 新会话：清掉上一个人的对话痕迹，别让 AI 面板还残留旧消息
     $('#sheet-body').innerHTML = '';
     $('#sheet-sub').textContent = '意图识别 · 多智能体 · 安全护栏';
-    return true;
+  }
+
+  // ---- 弹出面板：账密 / 注册 / 帮助 各一屏
+  const SHEET_TITLES = { manual: '账号密码登录', register: '注册账号', help: '帮助与说明' };
+
+  function openLoginSheet(pane) {
+    $$('#login-sheet .hm-login__pane').forEach((p) => { p.hidden = p.dataset.pane !== pane; });
+    $('#login-sheet-title').textContent = SHEET_TITLES[pane] || '登录';
+    setSheetError('');
+    if (pane === 'register') resetRegister();
+    toggleLoginDrop(false);
+    $('#login-sheet').hidden = false;
+  }
+
+  function closeLoginSheet() {
+    const box = $('#login-sheet');
+    if (!box) return;
+    box.hidden = true;
+    setSheetError('');
+  }
+
+  function openManualWith(username) {
+    openLoginSheet('manual');
+    $('#login-user').value = username || '';
+    $('#login-pass').value = '';
+    const target = username ? $('#login-pass') : $('#login-user');
+    setTimeout(() => { try { target.focus(); } catch { /* 忽略 */ } }, 30);
+  }
+
+  async function oneKeyLogin(who) {
+    const target = who || currentIdentity();
+    if (!target) { openLoginSheet('register'); return; }
+    if (!target.demo) {
+      // 自建账号：前端没有、也不该有别人的密码，停在这里让用户自己填。
+      openManualWith(target.username);
+      return;
+    }
+    const btn = $('#login-onekey');
+    btn.disabled = true;
+    const label = btn.textContent;
+    btn.textContent = '登录中…';
+    const ok = await doLogin(target.username, 'demo1234');
+    btn.disabled = false;
+    btn.textContent = label;
+    if (ok) await boot();
   }
 
   // ---------------------------------------------------------- 全局状态
@@ -1540,38 +1698,42 @@
   $('#login-form').addEventListener('submit', (e) => { e.preventDefault(); submitLogin(); });
 
   // ---------------------------------------------------------- 注册
-  // 两种模式共用一张表单：create 建新家（户主 L4），join 凭邀请码加入（成员 L3）。
-  // 第一屏默认 create——第一次用产品的人一定是给自己家装一套，不是去加入别人家。
-  let regMode = 'create';
+  // 两条路：create 建新家（户主 L4）、join 凭邀请码加入（成员 L3）。
+  // 刻意**不默认选中任何一条**：两条路要填的字段根本不是一套（家庭名 + 城市 vs 邀请码），
+  // 默认替人选了，用户就会在错的表单里填错的东西，然后怪系统。
+  let regMode = null;
 
-  function showRegister(show) {
-    $('#login-form').hidden = show;
-    $('#login-accounts').hidden = show;
-    $('#login-to-register').hidden = show;
-    $('#register-form').hidden = !show;
-    $('#register-error').hidden = true;
-    if (show) setTimeout(() => { try { $('#reg-name').focus(); } catch { /* 忽略 */ } }, 30);
+  function resetRegister() {
+    regMode = null;
+    const pick = $('#reg-pick');
+    if (!pick) return;
+    pick.hidden = false;
+    $('#reg-fields').hidden = true;
+    setSheetError('');
   }
 
-  function setRegMode(mode) {
+  function pickRegMode(mode) {
     regMode = mode;
-    $$('#reg-modes .hm-seg__item').forEach((b) => {
-      const on = b.dataset.regmode === mode;
-      b.classList.toggle('is-active', on);
-      b.setAttribute('aria-selected', on ? 'true' : 'false');
-    });
+    $('#reg-pick').hidden = true;
+    $('#reg-fields').hidden = false;
+    $('#reg-mode-label').textContent = mode === 'create' ? '创建新家庭' : '加入已有家庭';
     $('#reg-create-fields').hidden = mode !== 'create';
     $('#reg-join-fields').hidden = mode !== 'join';
     $('#register-submit').textContent = mode === 'create' ? '创建并进入' : '加入这个家';
+    setSheetError('');
+    setTimeout(() => { try { $('#reg-name').focus(); } catch { /* 忽略 */ } }, 30);
   }
 
   async function doRegister() {
+    if (!regMode) {
+      setSheetError('先选「创建新家庭」还是「加入已有家庭」');
+      return;
+    }
     const btn = $('#register-submit');
-    const err = $('#register-error');
-    err.hidden = true;
-    btn.disabled = true;
     const label = btn.textContent;
+    btn.disabled = true;
     btn.textContent = '处理中…';
+    setSheetError('');
 
     const body = {
       username: $('#reg-user').value.trim(),
@@ -1592,33 +1754,52 @@
       if (!res.ok) {
         // 后端把"哪一步不对"说得很具体（用户名已占用 / 邀请码无效 / 密码太短），
         // 直接照搬给用户。自己再编一句"注册失败"只是把有用的信息扔了。
-        err.textContent = data.detail || '注册失败，请检查填写内容';
-        err.hidden = false;
+        setSheetError(data.detail || '注册失败，请检查填写内容');
         btn.disabled = false;
         btn.textContent = label;
         return;
       }
       setToken(data.token);
-      $('#login').hidden = true;
-      $('#sheet-body').innerHTML = '';
-      $('#sheet-sub').textContent = '意图识别 · 多智能体 · 安全护栏';
-      showRegister(false);
+      // 刚注册的账号一定不是演示账号——它没有公开密码，下次点它要走账密面板
+      rememberAccount(toIdentity(data.user || {}, false));
+      enterConsole();
       await boot();
       showToast(regMode === 'create' ? '新家建好了，开始布置吧' : '已经加入这个家');
     } catch {
-      err.textContent = '网络异常，稍后再试';
-      err.hidden = false;
+      setSheetError('网络异常，稍后再试');
       btn.disabled = false;
       btn.textContent = label;
     }
   }
 
-  $('#login-to-register').addEventListener('click', () => showRegister(true));
-  $('#register-back').addEventListener('click', () => showRegister(false));
-  $('#register-form').addEventListener('submit', (e) => { e.preventDefault(); doRegister(); });
-  $$('#reg-modes .hm-seg__item').forEach((b) => {
-    b.addEventListener('click', () => setRegMode(b.dataset.regmode));
+  // ---- 登录页的事件绑定（集中一处，免得散落在文件各处）
+  $('#login-onekey').addEventListener('click', () => oneKeyLogin());
+  $('#login-switch').addEventListener('click', () => toggleLoginDrop());
+
+  // 点页面空白处收起下拉。注意要排除开关本身和下拉区，
+  // 否则点"切换账号"会被自己的 document 监听立刻收回去，下拉永远打不开。
+  document.addEventListener('click', (e) => {
+    const drop = $('#login-drop');
+    if (!drop || drop.hidden) return;
+    if (drop.contains(e.target) || $('#login-switch').contains(e.target)) return;
+    toggleLoginDrop(false);
   });
+
+  // 底部三个入口 + 下拉里的"注册一个新账号"共用同一批 [data-panel]
+  $$('#login [data-panel]').forEach((b) => {
+    b.addEventListener('click', () => openLoginSheet(b.dataset.panel));
+  });
+  $('#login-sheet-close').addEventListener('click', closeLoginSheet);
+  $('#login-sheet').addEventListener('click', (e) => {
+    if (e.target === $('#login-sheet')) closeLoginSheet();   // 点遮罩关闭
+  });
+
+  $('#login-form').addEventListener('submit', (e) => { e.preventDefault(); submitLogin(); });
+  $('#register-form').addEventListener('submit', (e) => { e.preventDefault(); doRegister(); });
+  $$('#reg-pick .hm-regpick__card').forEach((b) => {
+    b.addEventListener('click', () => pickRegMode(b.dataset.regmode));
+  });
+  $('#reg-reselect').addEventListener('click', resetRegister);
 
   // ---------------------------------------------------------- 通用表单弹窗
   /**

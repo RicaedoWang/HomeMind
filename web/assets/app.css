@@ -865,35 +865,219 @@ ul { margin: 0; padding: 0; list-style: none; }
   background: radial-gradient(circle at 50% 0%, rgba(79, 123, 255, 0.18), transparent 60%);
 }
 .hm-login__card {
-  position: relative; width: 100%; max-width: 380px; padding: var(--hm-space-6);
-  border-radius: var(--hm-radius-lg); background: var(--hm-bg-surface);
+  position: relative; width: 100%; max-width: 360px;
+  padding: var(--hm-space-6) var(--hm-space-5) var(--hm-space-5);
+  border-radius: var(--hm-radius-xl); background: var(--hm-bg-surface);
   border: 1px solid var(--hm-border-subtle); box-shadow: var(--hm-shadow-float);
 }
 .hm-login__brand {
-  display: flex; align-items: center; gap: var(--hm-space-2);
+  display: flex; align-items: center; justify-content: center; gap: var(--hm-space-2);
   font-size: var(--hm-fs-h2); font-weight: 600;
 }
-.hm-login__sub { margin: 6px 0 var(--hm-space-4); font-size: var(--hm-fs-sm); color: var(--hm-text-tertiary); }
-.hm-login__accounts { display: flex; flex-direction: column; gap: var(--hm-space-2); }
-.hm-login__acct {
-  display: flex; align-items: center; gap: var(--hm-space-3);
-  padding: var(--hm-space-3); border-radius: var(--hm-radius-sm);
-  border: 1px solid var(--hm-border-subtle); background: var(--hm-bg-sunken);
-  transition: border-color var(--hm-dur-instant) var(--hm-ease-standard);
+.hm-login__sub {
+  margin: 6px 0 var(--hm-space-5); text-align: center;
+  font-size: var(--hm-fs-sm); color: var(--hm-text-tertiary);
 }
-.hm-login__acct:hover { border-color: var(--hm-color-brand); }
-.hm-login__acct .hm-listitem__body { flex: 1; min-width: 0; text-align: left; }
-.hm-login__acct .hm-listitem__title { font-size: var(--hm-fs-body); }
-.hm-login__acct .hm-listitem__desc { font-size: var(--hm-fs-xs); }
-.hm-login form { display: flex; flex-direction: column; gap: var(--hm-space-3); margin-top: var(--hm-space-4); }
-.hm-login form input {
+
+/* --- 上次登录的身份（QQ 式：大头像 + 名字 + 切换账号） --- */
+.hm-login__hero {
+  position: relative;   /* 下拉列表的定位基准 */
+  display: flex; flex-direction: column; align-items: center; gap: var(--hm-space-2);
+  padding: var(--hm-space-5) var(--hm-space-4) var(--hm-space-3);
+  border-radius: var(--hm-radius-lg);
+  background: var(--hm-bg-sunken);
+  border: 1px solid var(--hm-border-subtle);
+}
+.hm-login__avatar {
+  width: 64px; height: 64px; border-radius: var(--hm-radius-full);
+  display: grid; place-items: center;
+  font-size: var(--hm-fs-h1); font-weight: 600; color: #fff;
+  background: linear-gradient(135deg, var(--hm-color-brand), var(--hm-color-accent));
+  box-shadow: 0 8px 24px rgba(79, 123, 255, 0.32);
+}
+.hm-login__who { text-align: center; }
+.hm-login__name { font-size: var(--hm-fs-h2); font-weight: 600; line-height: 1.3; }
+.hm-login__meta { margin-top: 2px; font-size: var(--hm-fs-xs); color: var(--hm-text-tertiary); }
+.hm-login__switch {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 12px; border-radius: var(--hm-radius-full);
+  font-size: var(--hm-fs-sm); color: var(--hm-color-brand);
+  background: transparent;
+  transition: background var(--hm-dur-instant) var(--hm-ease-standard);
+}
+.hm-login__switch:hover { background: var(--hm-color-brand-soft); }
+.hm-login__switch .hm-ico { transition: transform var(--hm-dur-instant) var(--hm-ease-standard); }
+.hm-login__switch[aria-expanded="true"] .hm-ico { transform: rotate(180deg); }
+
+/* 切换账号下拉：默认折叠，展开后浮在卡片内容之上 */
+.hm-login__drop {
+  position: absolute; left: 0; right: 0; top: calc(100% + 8px); z-index: 5;
+  padding: var(--hm-space-2);
+  border-radius: var(--hm-radius-md);
+  background: var(--hm-bg-elevated);
+  border: 1px solid var(--hm-border-strong);
+  box-shadow: var(--hm-shadow-float);
+  max-height: 46vh; overflow-y: auto;
+  text-align: left;
+  animation: hm-drop-in var(--hm-dur-fast) var(--hm-ease-emphasis);
+}
+.hm-login__drop[hidden] { display: none; }
+@keyframes hm-drop-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.hm-login__drop-label {
+  margin: var(--hm-space-2) var(--hm-space-2) var(--hm-space-1);
+  font-size: var(--hm-fs-xs); color: var(--hm-text-tertiary);
+}
+.hm-login__drop-list { display: flex; flex-direction: column; gap: 2px; }
+.hm-login__acct {
+  display: flex; align-items: center; gap: var(--hm-space-2);
+  width: 100%; padding: var(--hm-space-2); border-radius: var(--hm-radius-sm);
+  text-align: left;
+  transition: background var(--hm-dur-instant) var(--hm-ease-standard);
+}
+.hm-login__acct:hover { background: var(--hm-bg-sunken); }
+.hm-login__acct:active { transform: scale(0.99); }
+.hm-login__acct-avatar {
+  width: 32px; height: 32px; flex: none; border-radius: var(--hm-radius-full);
+  display: grid; place-items: center;
+  font-size: var(--hm-fs-sm); color: #fff;
+}
+.hm-login__acct-body { flex: 1; min-width: 0; }
+.hm-login__acct-name { display: block; font-size: var(--hm-fs-body); }
+.hm-login__acct-name em {
+  margin-left: 4px; font-style: normal;
+  font-size: var(--hm-fs-xs); color: var(--hm-text-tertiary);
+}
+.hm-login__acct-meta {
+  display: block; font-size: var(--hm-fs-xs); color: var(--hm-text-tertiary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hm-login__empty { padding: var(--hm-space-3) var(--hm-space-2); font-size: var(--hm-fs-xs); color: var(--hm-text-tertiary); }
+.hm-login__drop-add {
+  margin-top: var(--hm-space-2); width: 100%;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  padding: var(--hm-space-3) var(--hm-space-2);
+  border-top: 1px solid var(--hm-border-subtle);
+  font-size: var(--hm-fs-sm); color: var(--hm-color-brand);
+}
+.hm-login__drop-add:hover { color: var(--hm-color-brand); opacity: 0.85; }
+
+.hm-login__onekey {
+  margin-top: var(--hm-space-4);
+  height: 48px; width: 100%; font-size: var(--hm-fs-body);
+}
+.hm-login__hint { margin: var(--hm-space-3) 0 0; font-size: var(--hm-fs-xs); color: var(--hm-text-tertiary); line-height: 1.6; }
+.hm-login__error { margin: var(--hm-space-2) 0 0; font-size: var(--hm-fs-sm); color: var(--hm-color-danger); }
+.hm-login__error[hidden] { display: none; }
+
+/* 底部三个次选入口 */
+.hm-login__foot {
+  margin-top: var(--hm-space-5); padding-top: var(--hm-space-4);
+  border-top: 1px solid var(--hm-border-subtle);
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--hm-space-2);
+}
+.hm-login__footbtn {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: var(--hm-space-2) 0; border-radius: var(--hm-radius-sm);
+  font-size: var(--hm-fs-xs); color: var(--hm-text-secondary);
+}
+.hm-login__footicon {
+  width: 40px; height: 40px; border-radius: var(--hm-radius-full);
+  display: grid; place-items: center;
+  border: 1px solid var(--hm-border-strong); color: var(--hm-text-secondary);
+  transition: all var(--hm-dur-instant) var(--hm-ease-standard);
+}
+.hm-login__footbtn:hover .hm-login__footicon { color: var(--hm-color-brand); border-color: var(--hm-color-brand); }
+.hm-login__footbtn:active .hm-login__footicon { transform: scale(0.94); }
+
+/* --- 弹出面板（账密 / 注册 / 帮助） --- */
+.hm-login__sheet {
+  position: fixed; inset: 0; z-index: 95;
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--hm-space-4);
+  background: var(--hm-mask);
+  animation: hm-fade-in var(--hm-dur-fast) var(--hm-ease-standard);
+}
+.hm-login__sheet[hidden] { display: none; }
+@keyframes hm-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.hm-login__sheet-card {
+  width: 100%; max-width: 360px; max-height: 86vh; overflow-y: auto;
+  padding: var(--hm-space-5);
+  border-radius: var(--hm-radius-lg);
+  background: var(--hm-bg-elevated);
+  border: 1px solid var(--hm-border-strong);
+  box-shadow: var(--hm-shadow-float);
+  animation: hm-sheet-in var(--hm-dur-base) var(--hm-ease-emphasis);
+}
+@keyframes hm-sheet-in {
+  from { opacity: 0; transform: translateY(18px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.hm-login__sheet-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: var(--hm-space-3);
+}
+.hm-login__sheet-title { font-size: var(--hm-fs-h3); font-weight: 600; }
+.hm-login__sheet-x {
+  width: 30px; height: 30px; border-radius: var(--hm-radius-full);
+  display: grid; place-items: center; color: var(--hm-text-tertiary);
+}
+.hm-login__sheet-x:hover { background: var(--hm-bg-sunken); color: var(--hm-text-primary); }
+
+.hm-login__pane { display: flex; flex-direction: column; gap: var(--hm-space-3); }
+.hm-login__pane[hidden] { display: none; }
+.hm-login__pane input {
   height: 44px; padding: 0 var(--hm-space-4); border-radius: var(--hm-radius-sm);
   border: 1px solid var(--hm-border-strong); background: var(--hm-bg-sunken); outline: none;
+  font-size: var(--hm-fs-body);
 }
-.hm-login form input:focus { border-color: var(--hm-color-brand); }
+.hm-login__pane input:focus { border-color: var(--hm-color-brand); }
 .hm-login .hm-btn { height: 44px; width: 100%; }
-.hm-login__hint { margin: var(--hm-space-3) 0 0; font-size: var(--hm-fs-xs); color: var(--hm-text-tertiary); }
-.hm-login__error { margin: var(--hm-space-2) 0 0; font-size: var(--hm-fs-sm); color: var(--hm-color-danger); }
+
+/* 注册先选路：两条路的表单字段完全不同，混在一屏只会让人填错 */
+.hm-regpick { display: flex; flex-direction: column; gap: var(--hm-space-2); }
+.hm-regpick__card {
+  display: flex; align-items: center; gap: var(--hm-space-3);
+  padding: var(--hm-space-3); border-radius: var(--hm-radius-md);
+  border: 1px solid var(--hm-border-subtle); background: var(--hm-bg-sunken);
+  text-align: left;
+  transition: all var(--hm-dur-instant) var(--hm-ease-standard);
+}
+.hm-regpick__card:hover { border-color: var(--hm-color-brand); }
+.hm-regpick__card:active { transform: scale(0.99); }
+.hm-regpick__icon {
+  width: 40px; height: 40px; flex: none;
+  display: grid; place-items: center; border-radius: var(--hm-radius-sm);
+  background: var(--hm-color-brand-soft); color: var(--hm-color-brand);
+}
+.hm-regpick__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.hm-regpick__t { font-size: var(--hm-fs-body); font-weight: 500; }
+.hm-regpick__d { font-size: var(--hm-fs-xs); color: var(--hm-text-tertiary); line-height: 1.45; }
+.hm-regpick__arrow { color: var(--hm-text-tertiary); flex: none; }
+
+.hm-regfields { display: flex; flex-direction: column; gap: var(--hm-space-3); }
+.hm-regfields[hidden] { display: none; }
+.hm-regfields__head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: var(--hm-fs-sm); color: var(--hm-text-secondary);
+}
+.hm-login__link {
+  padding: 4px; font-size: var(--hm-fs-xs);
+  color: var(--hm-color-brand); background: transparent;
+}
+.hm-login__link:hover { text-decoration: underline; }
+
+/* 帮助面板 */
+.hm-help { margin: 0; display: flex; flex-direction: column; gap: 2px; }
+.hm-help dt { margin-top: var(--hm-space-3); font-size: var(--hm-fs-sm); font-weight: 600; }
+.hm-help dt:first-child { margin-top: 0; }
+.hm-help dd {
+  margin: 2px 0 0; font-size: var(--hm-fs-xs);
+  color: var(--hm-text-secondary); line-height: 1.6;
+}
+.hm-help code {
+  padding: 1px 5px; border-radius: 4px;
+  font-family: var(--hm-font-num); background: var(--hm-bg-sunken); color: var(--hm-color-brand);
+}
 
 /* 「问一句」输入框内联态 */
 .hm-envbar__ask {
@@ -1027,12 +1211,4 @@ ul { margin: 0; padding: 0; list-style: none; }
   box-shadow: var(--hm-shadow-card);
 }
 
-.hm-login__switch {
-  margin-top: var(--hm-space-3);
-  width: 100%; padding: 6px 0;
-  font-size: var(--hm-fs-sm);
-  color: var(--hm-color-brand);
-  background: transparent;
-}
-.hm-login__switch:hover { text-decoration: underline; }
 
