@@ -50,16 +50,25 @@ _TMP_DIR = Path(tempfile.mkdtemp(prefix="hm-verify-"))
 
 
 def isolate_stores() -> None:
-    """把账号库、家庭库、场景库都换成临时文件（必须在起服务之前调用）。"""
+    """把账号库、家庭库、场景库、设备库都换成临时文件（必须在起服务之前调用）。
+
+    这里有个踩过的坑：V1.3 新加了 device store，`tests/conftest.py` 那边
+    同步加了隔离 fixture，但这个脚本的名单忘了跟着加——于是每次跑验收，
+    测试注册的那个家庭就把"厨房""影音厅"两间自建房写进**用户的真实库**。
+    教训：**新增可写存储不只要改 conftest，凡是"换库"的名单都得一起改**，
+    落单的那一份就是数据泄漏的口子。
+    """
     from homemind.api.auth import set_account_store
     from homemind.auth.family_store import (
         FamilyStore, SceneStore, set_family_store, set_scene_store,
     )
     from homemind.auth.store import AccountStore
+    from homemind.tools.device_store import DeviceStore, set_device_store
 
     set_account_store(AccountStore(db_path=str(_TMP_DIR / "accounts.db")))
     set_family_store(FamilyStore(str(_TMP_DIR / "content.db")))
     set_scene_store(SceneStore(str(_TMP_DIR / "content.db")))
+    set_device_store(DeviceStore(str(_TMP_DIR / "content.db")))
 
 
 def free_port() -> int:
@@ -93,6 +102,9 @@ class Client:
 
     def post(self, path: str, body: dict | None = None) -> httpx.Response:
         return self._c.post(path, json=body or {})
+
+    def put(self, path: str, body: dict | None = None) -> httpx.Response:
+        return self._c.put(path, json=body or {})
 
     def delete(self, path: str) -> httpx.Response:
         return self._c.delete(path)
@@ -315,6 +327,70 @@ def main() -> int:
             fresh.delete(f"/api/console/scenes/{scene['id']}")
             names = [s["name"] for s in fresh.get("/api/console/scenes").json()["scenes"]]
             check("自建场景能删除", "端到端改名" not in names, f"剩余 {len(names)} 个")
+
+            # ---- 设备与房间管理（V1.3）
+            # 这一段必须走真实的 JWT + 真实服务，单测用的是 dependency_overrides
+            # 旁路认证，测不出"过了鉴权之后租户还对不对"。
+            r = fresh.post("/api/console/devices", {
+                "name": "咖啡机", "room": "厨房", "device_type": "extra",
+                "min_value": 1, "max_value": 5, "unit": "档", "initial_value": 3,
+            })
+            added = r.json().get("device", {}) if r.status_code == 200 else {}
+            check("能添加自定义电器", bool(added.get("id")),
+                  f"POST /devices → {r.status_code} {added.get('name', '')}")
+
+            names = [d["name"] for d in fresh.state()["devices"]]
+            check("新设备出现在控制台", "咖啡机" in names, f"共 {len(names)} 台")
+
+            r = fresh.post("/api/console/devices", {"name": "咖啡机", "room": "客厅"})
+            check("重名设备被拒绝 → 409", r.status_code == 409,
+                  f"重复添加 → {r.status_code}")
+
+            # 关键一条：用户自己加的电器，必须能被自然语言控制
+            r = fresh.post("/api/console/assistant", {"text": "把咖啡机打开"})
+            coffee = next((d for d in fresh.state()["devices"] if d["name"] == "咖啡机"), {})
+            check("自建设备能被 AI 控制", coffee.get("power") is True,
+                  f"「把咖啡机打开」→ power={coffee.get('power')}")
+
+            r = fresh.post("/api/console/devices", {
+                "name": "落地灯", "room": "影音室", "device_type": "light",
+                "min_value": 0, "max_value": 100, "unit": "%",
+            })
+            lamp = r.json().get("device", {})
+            r = fresh.post(f"/api/console/devices/{lamp['id']}/control",
+                           {"action": "set_value", "value": 40})
+            check("自建房间与调值都生效",
+                  r.json().get("device", {}).get("value") == 40,
+                  f"影音室落地灯 → {r.json().get('device', {}).get('value')}")
+
+            r = fresh.put(f"/api/console/devices/{lamp['id']}", {"name": "观影灯"})
+            check("设备能改名", r.json().get("device", {}).get("name") == "观影灯",
+                  f"PUT /devices → {r.status_code}")
+
+            r = fresh.delete("/api/console/rooms/厨房")
+            check("有设备的房间删不掉 → 409", r.status_code == 409,
+                  f"厨房还有咖啡机 → {r.status_code}")
+
+            fresh.post("/api/console/rooms", {"name": "临时房"})
+            r = fresh.delete("/api/console/rooms/临时房")
+            check("空房间能删除", r.status_code == 200, f"DELETE /rooms → {r.status_code}")
+
+            r = fresh.put("/api/console/rooms/影音室", {"new_name": "影音厅"})
+            rooms = [x["name"] for x in fresh.get("/api/console/rooms").json()["rooms"]]
+            check("房间改名生效", "影音厅" in rooms, f"PUT /rooms → {r.status_code}")
+
+            r = xm.delete(f"/api/console/devices/{lamp['id']}")
+            check("删别家的设备 → 404", r.status_code == 404,
+                  f"小明 DELETE → {r.status_code}")
+
+            r = fresh.delete(f"/api/console/devices/{lamp['id']}")
+            check("设备能删除", r.status_code == 200, f"DELETE /devices → {r.status_code}")
+
+            # 删光之后不能再自己长回来（seed_log 守的那条）
+            for dev in fresh.state()["devices"]:
+                fresh.delete(f"/api/console/devices/{dev['id']}")
+            left = len(fresh.state()["devices"])
+            check("内置设备删光后不复活", left == 0, f"清空后仍有 {left} 台")
     finally:
         server.should_exit = True
 

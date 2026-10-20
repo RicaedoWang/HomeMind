@@ -176,7 +176,7 @@ async def test_multi_graph_conflict_suspends_execution(tmp_path):
         def __init__(self, intents: list[Intent]) -> None:
             self._intents = intents
 
-        async def parse(self, text: str) -> list[Intent]:
+        async def parse(self, text: str, family_id: str | None = None) -> list[Intent]:
             return self._intents
 
     intents = [

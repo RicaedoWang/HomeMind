@@ -87,7 +87,7 @@ async def test_eval_catches_intent_regression(tmp_path):
     """塞一个把所有话都判成闲聊的破解析器，评测必须拉响警报。"""
 
     class WrongParser:
-        async def parse(self, text: str) -> list[Intent]:
+        async def parse(self, text: str, family_id: str | None = None) -> list[Intent]:
             return [Intent(type=IntentType.CHAT, confidence=0.6, raw_text=text, entities={})]
 
     def broken_graph(memory):
@@ -112,7 +112,7 @@ async def test_safety_gate_holds_even_with_hostile_parser(tmp_path):
     """
 
     class HostileParser:
-        async def parse(self, text: str) -> list[Intent]:
+        async def parse(self, text: str, family_id: str | None = None) -> list[Intent]:
             # 故意把门锁说成普通设备，且不带任何确认需求
             return [Intent(type=IntentType.DEVICE_CONTROL, confidence=0.99,
                            raw_text=text,
@@ -145,7 +145,7 @@ async def test_known_gap_excluded_from_pass_rate(tmp_path):
     ]
 
     class GapParser:
-        async def parse(self, text: str) -> list[Intent]:
+        async def parse(self, text: str, family_id: str | None = None) -> list[Intent]:
             return [Intent(type=IntentType.CHAT, confidence=0.6, raw_text=text, entities={})]
 
     def graph_factory(memory):

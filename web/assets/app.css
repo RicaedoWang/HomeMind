@@ -1212,3 +1212,103 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 
 
+
+/* ---------------------------------------------------------------- 设备与房间管理（V1.3）
+
+   工具条贴在设备区顶部：加电器、管理设备、管房间三个动作。
+   样式上刻意做得比主按钮轻——它是"偶尔用一次"的能力，
+   抢了设备卡片的视觉重量，用户每看一次设备都要多扫三个按钮。 */
+
+.hm-devbar {
+  display: flex; align-items: center; gap: var(--hm-space-2);
+  margin: var(--hm-space-3) 0 var(--hm-space-2);
+  flex-wrap: wrap;
+}
+.hm-devbar__btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: var(--hm-bg-sunken);
+  border: 1px solid var(--hm-border-subtle);
+  color: var(--hm-text-secondary);
+  font-size: var(--hm-fs-xs);
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.hm-devbar__btn:hover { border-color: var(--hm-border-strong); color: var(--hm-text-primary); }
+.hm-devbar__btn:active { transform: scale(0.97); }
+.hm-devbar__btn--main {
+  background: var(--hm-color-brand-soft);
+  border-color: transparent;
+  color: var(--hm-color-brand);
+  font-weight: 600;
+}
+.hm-devbar__btn--main:hover { border-color: var(--hm-color-brand); color: var(--hm-color-brand); }
+
+/* ---------- 管理面板（设备 / 房间共用） ---------- */
+
+.hm-manage {
+  display: flex; flex-direction: column; gap: var(--hm-space-3);
+  text-align: left;
+}
+.hm-manage__group {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--hm-border-subtle);
+  border-radius: var(--hm-radius-xs);
+  overflow: hidden;
+}
+.hm-manage__gtitle {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px;
+  background: var(--hm-bg-sunken);
+  font-size: var(--hm-fs-xs);
+  color: var(--hm-text-tertiary);
+}
+.hm-manage__row {
+  display: flex; align-items: center; gap: var(--hm-space-2);
+  padding: 10px 12px;
+  border-top: 1px solid var(--hm-border-subtle);
+}
+.hm-manage__info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.hm-manage__info b {
+  font-size: var(--hm-fs-sm);
+  color: var(--hm-text-primary);
+  font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hm-manage__info span { font-size: var(--hm-fs-xs); color: var(--hm-text-tertiary); }
+.hm-manage__act {
+  padding: 5px 10px;
+  border-radius: var(--hm-radius-xs);
+  background: transparent;
+  border: 1px solid var(--hm-border-subtle);
+  color: var(--hm-text-secondary);
+  font-size: var(--hm-fs-xs);
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.hm-manage__act:hover { border-color: var(--hm-border-strong); color: var(--hm-text-primary); }
+.hm-manage__act.is-danger:hover {
+  border-color: var(--hm-color-danger, #ef4444);
+  color: var(--hm-color-danger, #ef4444);
+}
+.hm-manage__act[data-armed] {
+  border-color: var(--hm-color-danger, #ef4444);
+  color: var(--hm-color-danger, #ef4444);
+}
+.hm-manage__hint {
+  margin: 0;
+  font-size: var(--hm-fs-xs);
+  color: var(--hm-text-tertiary);
+  line-height: 1.6;
+}
+.hm-manage__rename { flex: 1; min-width: 80px; }
+
+/* ---------- 表单里的一行两三个输入框 ---------- */
+
+.hm-field__row { display: flex; align-items: center; gap: 6px; }
+.hm-field__row .hm-input { flex: 1; min-width: 0; }
+.hm-field__sep { color: var(--hm-text-tertiary); font-size: var(--hm-fs-xs); }
+.hm-field__hint { font-size: var(--hm-fs-xs); color: var(--hm-text-tertiary); line-height: 1.5; }

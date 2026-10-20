@@ -145,9 +145,13 @@ def _intent_to_task(intent_dict: dict[str, Any]) -> dict[str, Any] | None:
 
 
 async def parse_intent_node(state: AgentState, parser: IntentParser) -> dict[str, Any]:
-    """节点 1：意图识别 + 任务规划。"""
+    """节点 1：意图识别 + 任务规划。
+
+    family_id 必须传下去：用户自建的设备（咖啡机、加湿器…）只有本家庭认识，
+    不传的话规则层只会拿内置词表去匹配，"打开咖啡机"直接判成闲聊。
+    """
     with span("node.parse_intent", logger, trace_id=state.get("trace_id", "-")):
-        intents = await parser.parse(state["user_input"])
+        intents = await parser.parse(state["user_input"], state.get("family_id"))
         tasks = [t for t in (_intent_to_task(i.to_dict()) for i in intents) if t]
         return {
             "intents": [i.to_dict() for i in intents],

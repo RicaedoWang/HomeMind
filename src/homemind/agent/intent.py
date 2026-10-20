@@ -96,19 +96,60 @@ def split_multi_intent(text: str) -> list[str]:
     return segments or [text]
 
 
-def _extract_entities(text: str) -> dict[str, Any]:
+def _family_vocab(family_id: str | None) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """读当前家庭的设备名与房间名，给规则匹配用。
+
+    为什么规则层必须知道用户自己加了什么：
+    `DEVICES` 是写死的词表（灯/空调/窗帘…），用户新建一台"咖啡机"，
+    规则层认不出它，`has_device` 判 False → 整句落到 `chat` → AI 回一句"我在听"。
+    用户会觉得"我明明加了设备，它却听不懂"。
+
+    读的是**完整设备名**（"客厅灯""咖啡机"），不是类型名——
+    完整名能直接命中 `_find_device` 的精确匹配那一档，比靠子串猜准得多。
+
+    延迟 import：避免 intent → tools → auth 这条链在模块加载期形成环。
+    读失败一律返回空元组，规则层退回内置词表——设备库出问题不该让
+    整条意图链路挂掉，最多是"听不懂自建设备"，还能用内置的。
+    """
+    if not family_id:
+        return (), ()
+    try:
+        from ..tools.device_store import get_device_store
+        store = get_device_store()
+        names = tuple(d.name for d in store.devices_of(family_id).values())
+        return names, tuple(store.rooms_of(family_id))
+    except Exception:  # noqa: BLE001 — 词表是增强能力，拿不到就降级
+        logger.warning("family vocab unavailable: %s", family_id)
+        return (), ()
+
+
+def _extract_entities(
+    text: str,
+    extra_devices: tuple[str, ...] = (),
+    extra_rooms: tuple[str, ...] = (),
+) -> dict[str, Any]:
     """从单句文本抽取实体：房间、设备、动作、数值、时间。"""
     entities: dict[str, Any] = {}
 
-    room = next((r for r in ROOMS if r in text), None)
+    # 房间按名字长度降序匹配："儿童房"要先于"房"命中。
+    # 用户自建房间并入词表，否则"把儿童房的灯关掉"抽不出房间。
+    room = next((r for r in sorted((*extra_rooms, *ROOMS), key=len, reverse=True)
+                 if r in text), None)
     if room:
         entities["room"] = room
 
     device = None
-    for alias, canonical in DEVICE_ALIAS.items():
-        if alias in text:
-            device = canonical
+    # 完整设备名优先，长名在前：否则"灯"会把"客厅灯"抢走，
+    # 消歧全靠 room 兜底，一旦用户没说房间就白瞎。
+    for name in sorted(set(extra_devices), key=len, reverse=True):
+        if name in text:
+            device = name
             break
+    if device is None:
+        for alias, canonical in DEVICE_ALIAS.items():
+            if alias in text:
+                device = canonical
+                break
     if device is None:
         device = next((d for d in DEVICES if d in text), None)
     if device:
@@ -128,16 +169,29 @@ def _extract_entities(text: str) -> dict[str, Any]:
     elif any(w in text for w in QUERY_WORDS):
         entities["action"] = "query"
 
-    # 绝对数值："调到26度" / "设置成 24 度"
-    match = re.search(r"(?:调到|调至|设置为|设成|调成)?\s*(\d+|[一两二三四五六七八九十]+)\s*度", text)
+    # 绝对数值："调到26度" / "设置成 24 度" / "调到 4 档" / "设为 50%"
+    # 单位收成白名单而不是只认"度"：用户自建的咖啡机是"档"、加湿器是"%"、
+    # 音箱是"级"，只认"度"的话这些设备永远抽不出目标值，
+    # set_value 只会回一句"调值动作缺少 value 参数"。
+    # 负向前瞻排除"调到9点"这类——那是时间不是设定值。
+    match = re.search(
+        r"(?:调到|调至|设置为|设成|调成)\s*"
+        r"(\d+|[一两二三四五六七八九十]+)\s*"
+        r"(度|档|级|%|摄氏度)?(?!\s*点)",
+        text,
+    )
     if match:
         value = _to_int(match.group(1))
         if value is not None:
             entities["value"] = float(value)
 
-    # 增量数值："调低两度" / "升高3度"
+    # 增量数值："调低两度" / "升高3度" / "调低 2 档"
     if entities.get("action") in ("delta_up", "delta_down"):
-        match = re.search(r"(?:调高|调低|升高|降低|提高|升|降)\s*(\d+|[一两二三四五六七八九十]+)\s*度", text)
+        match = re.search(
+            r"(?:调高|调低|升高|降低|提高|升|降)\s*"
+            r"(\d+|[一两二三四五六七八九十]+)\s*(度|档|级|%)?",
+            text,
+        )
         if match:
             delta = _to_int(match.group(1))
             if delta is not None:
@@ -146,7 +200,7 @@ def _extract_entities(text: str) -> dict[str, Any]:
     return entities
 
 
-def _classify(text: str) -> tuple[IntentType, float]:
+def _classify(text: str, extra_devices: tuple[str, ...] = ()) -> tuple[IntentType, float]:
     """规则分类：判断单句意图类型与置信度。"""
     # 记忆查询优先判定（短语更具体，且不能被"记住"类词表抢走）
     if any(w in text for w in QUERY_MEMORY_WORDS):
@@ -156,7 +210,11 @@ def _classify(text: str) -> tuple[IntentType, float]:
     if any(w in text for w in MEMORY_WORDS):
         return IntentType.MEMORY_WRITE, 0.9
 
-    has_device = any(d in text for d in DEVICES) or any(a in text for a in DEVICE_ALIAS)
+    # 用户自建设备（咖啡机、加湿器…）必须算作"有设备"，
+    # 否则"打开咖啡机"会因为词表里没有"咖啡机"而被判成闲聊。
+    has_device = (any(d in text for d in DEVICES)
+                  or any(a in text for a in DEVICE_ALIAS)
+                  or any(name in text for name in extra_devices))
     # 查询词也要算作"有动作"，否则"空调多少度"这类纯查询会被判成低置信度而误触发确认
     has_action = any(
         w in text
@@ -215,23 +273,29 @@ class IntentParser:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
 
-    async def parse(self, text: str) -> list[Intent]:
-        """解析用户输入，返回意图列表（多意图时返回多个）。"""
+    async def parse(self, text: str, family_id: str | None = None) -> list[Intent]:
+        """解析用户输入，返回意图列表（多意图时返回多个）。
+
+        `family_id` 决定"认识哪些设备"：用户自建的咖啡机只有它自己家里有，
+        别家说"打开咖啡机"就该听不懂。规则模式靠它动态并入设备词表，
+        大模型模式靠它把本家庭设备清单写进 prompt。
+        """
         if not self.settings.llm.use_mock:
-            parsed = await self._parse_by_llm(text)
+            parsed = await self._parse_by_llm(text, family_id)
             if parsed:
                 return parsed
             logger.warning("llm parse failed, fallback to rule-based parsing")
 
-        return self._parse_by_rule(text)
+        return self._parse_by_rule(text, family_id)
 
-    def _parse_by_rule(self, text: str) -> list[Intent]:
+    def _parse_by_rule(self, text: str, family_id: str | None = None) -> list[Intent]:
         """规则解析（默认路径）。"""
         with span("intent.parse.rule", logger, text=text):
+            extra_devices, extra_rooms = _family_vocab(family_id)
             intents: list[Intent] = []
             for segment in split_multi_intent(text):
-                intent_type, confidence = _classify(segment)
-                entities = _extract_entities(segment)
+                intent_type, confidence = _classify(segment, extra_devices)
+                entities = _extract_entities(segment, extra_devices, extra_rooms)
                 if intent_type == IntentType.SCHEDULE:
                     # 清洗设备类噪声实体：'提醒我明天开会' 里的 '开' 会被误判成 turn_on
                     for noise in ("action", "device_name", "room", "value", "delta"):
@@ -247,7 +311,7 @@ class IntentParser:
                                                 "types": [i.type.value for i in intents]}})
             return intents
 
-    async def _parse_by_llm(self, text: str) -> list[Intent] | None:
+    async def _parse_by_llm(self, text: str, family_id: str | None = None) -> list[Intent] | None:
         """大模型解析。失败返回 None，由调用方回退规则模式（依赖可降级）。
 
         仅在关闭 mock 且配置了 api_key 时启用。
@@ -258,10 +322,22 @@ class IntentParser:
                            self.settings.llm.use_mock, bool(self.settings.llm.api_key))
             return None
 
+        # 本家庭的真实设备与房间。不写进去的话，模型看到"打开咖啡机"只能瞎给
+        # device_name，而 `_find_device` 是按名字找的——名字不对就找不着。
+        extra_devices, extra_rooms = _family_vocab(family_id)
+        if extra_devices:
+            device_lines = "、".join(sorted(set(extra_devices)))
+            room_lines = "、".join(extra_rooms) if extra_rooms else "（未单独登记）"
+            home_ctx = (f"这个家庭现有的设备：{device_lines}\n"
+                        f"这个家庭的房间：{room_lines}\n"
+                        f"用户提到的设备名请**原样**使用上面清单里的完整名称。\n")
+        else:
+            home_ctx = ""
+
         system = "你是智能家居助手的意图解析器。只输出 JSON，不要任何解释文字。"
         prompt = f"""{describe_now()}
 
-解析下面的用户输入，输出一个 JSON 数组，每个元素包含：
+{home_ctx}解析下面的用户输入，输出一个 JSON 数组，每个元素包含：
 - type: device_control / schedule / knowledge / memory_query / memory_write / chat
 - confidence: 0~1 之间的浮点数
 - entities: 对象，可包含这些字段

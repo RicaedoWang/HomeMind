@@ -50,6 +50,7 @@ from ..memory.short_term import get_short_term_memory
 from ..tools.calendar_server import delete_schedule, get_schedules, reset_schedules
 from ..core.tenancy import DEFAULT_FAMILY_ID, FAMILY_ARG
 from ..tools.device_server import devices_of, get_device_states
+from ..tools.device_store import DEVICE_TYPES, get_device_store
 from ..tools.registry import default_registry
 
 logger = get_logger("api.console")
@@ -233,6 +234,13 @@ def _device_payload(family_id: str) -> list[dict[str, Any]]:
             "type": dev.device_type,
             "power": bool(dev.power),
             "value": dev.value,
+            # V1.3：用户自建的电器要知道自己能调到哪里，否则界面画不出刻度，
+            # 后端 set_value 也没有依据去夹范围。
+            "minValue": dev.min_value,
+            "maxValue": dev.max_value,
+            "unit": dev.unit,
+            "adjustable": dev.adjustable,
+            "builtin": dev.builtin,
             "online": True,
             "lowBattery": False,
             "alert": False,
@@ -270,8 +278,13 @@ def _device_payload(family_id: str) -> list[dict[str, Any]]:
                                      else "已关闭")
             payload["control"] = "dimmer"
         else:
-            payload["statusText"] = "已开" if dev.power else "已关闭"
-            payload["control"] = "switch"
+            # 兜底分支同时服务于"用户自建的电器"。可调设备显示当前设定值，
+            # 不可调的只说开关——给没有刻度的设备编个百分比是撒谎。
+            if dev.power and dev.value is not None:
+                payload["statusText"] = f"已开 {int(dev.value)}{dev.unit}"
+            else:
+                payload["statusText"] = "已开" if dev.power else "已关闭"
+            payload["control"] = "dimmer" if dev.adjustable else "switch"
         devices.append(payload)
     return devices
 
@@ -519,11 +532,290 @@ async def control_device(
             "degraded": result.degraded, "error": result.error}
 
 
+# ---------------------------------------------------------------- 设备与房间管理
+#
+# V1.3 新增：用户能自己添加电器、自己管理房间。
+# 三条必须守住的规矩：
+# 1. **逐项校验租户**：任何 device_id / 房间名都要先确认属于 token 里的家庭。
+#    拿别家的 id 来改，必须在动手之前 403，不是改完再道歉。
+# 2. **同家庭不能有重名设备**：`_find_device` 按名字精确匹配，
+#    两台都叫"台灯"时 AI 永远只能操作排在前面的那台，且用户完全无从察觉。
+# 3. **删房间前先看有没有设备**：少爷选的是"不丢数据"，非空房间一律拒绝。
+
+class DeviceCreateRequest(BaseModel):
+    """新增设备。只允许这四个字段——device_id 由服务端生成。"""
+
+    name: str
+    room: str
+    device_type: str = "extra"
+    min_value: float | None = None
+    max_value: float | None = None
+    unit: str = ""
+    initial_value: float | None = None
+
+
+class DeviceUpdateRequest(BaseModel):
+    """编辑设备。所有字段可省略，省略即不改。"""
+
+    name: str | None = None
+    room: str | None = None
+    min_value: float | None = None
+    max_value: float | None = None
+    unit: str | None = None
+    # 显式"把可调范围去掉"的开关。没有它就没法区分"不传=不改"和"传空=改成不可调"。
+    clear_range: bool = False
+
+
+class RoomCreateRequest(BaseModel):
+    name: str
+
+
+class RoomRenameRequest(BaseModel):
+    new_name: str
+
+
+def _ensure_device_seeded(family_id: str) -> None:
+    """触发内置家庭的懒播种。
+
+    内置家庭的设备与房间是在第一次读 `devices_of()` 时才写进库的（懒播种）。
+    房间管理接口如果不先摸一下设备，用户打开"房间管理"会看到一片空白——
+    明明是预装的客厅、主卧，却一个都没有，看着像坏了。
+    非内置家庭这里什么也不做（没有模板，本来就不该凭空造房间）。
+    """
+    devices_of(family_id)
+
+
+def _device_admin_payload(dev) -> dict[str, Any]:
+    """设备管理面板用的结构（比卡片多带可调范围与来源）。"""
+    return {
+        "id": dev.device_id,
+        "name": dev.name,
+        "room": dev.room,
+        "type": dev.device_type,
+        "power": bool(dev.power),
+        "value": dev.value,
+        "minValue": dev.min_value,
+        "maxValue": dev.max_value,
+        "unit": dev.unit,
+        "adjustable": dev.adjustable,
+        "builtin": dev.builtin,
+    }
+
+
+def _validate_device_fields(
+    name: str, room: str, device_type: str,
+    min_value: float | None, max_value: float | None, unit: str,
+) -> str | None:
+    """校验并返回错误文案（None 表示通过）。
+
+    单独抽出来是因为新建和编辑要走同一套规则——
+    只在新建时校验、编辑时放行，等于留了个改坏的入口。
+    """
+    if not name.strip():
+        return "设备名称不能为空"
+    if len(name.strip()) > 20:
+        return "设备名称太长了，20 字以内"
+    if not room.strip():
+        return "必须选择或填写房间"
+    if len(room.strip()) > 12:
+        return "房间名太长了，12 字以内"
+    if device_type not in DEVICE_TYPES:
+        return f"不认识的设备类型：{device_type}"
+    if (min_value is None) != (max_value is None):
+        return "可调范围要填就两个都填（最小值和最大值）"
+    if min_value is not None and max_value is not None:
+        if min_value >= max_value:
+            return "最大值必须大于最小值"
+    if unit and len(unit) > 6:
+        return "单位太长了，6 字以内"
+    return None
+
+
+@router.get("/device-types")
+def list_device_types() -> dict[str, Any]:
+    """可选的设备类型清单（前端下拉用）。静态数据，不需要鉴权。"""
+    return {"types": [{"value": k, "label": v} for k, v in DEVICE_TYPES.items()]}
+
+
+@router.get("/rooms")
+def list_rooms(user: AuthUser = Depends(current_user)) -> dict[str, Any]:
+    """本家庭的房间清单，带每个房间的设备数量。"""
+    _ensure_device_seeded(user.family_id)
+    store = get_device_store()
+    rooms = store.rooms_of(user.family_id)
+    return {
+        "rooms": [
+            {"name": name, "deviceCount": len(store.devices_in_room(user.family_id, name))}
+            for name in rooms
+        ]
+    }
+
+
+@router.post("/rooms")
+def create_room(
+    req: RoomCreateRequest, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="房间名不能为空")
+    if len(name) > 12:
+        raise HTTPException(status_code=400, detail="房间名太长了，12 字以内")
+    _ensure_device_seeded(user.family_id)
+    store = get_device_store()
+    if name in store.rooms_of(user.family_id):
+        raise HTTPException(status_code=409, detail=f"「{name}」这个房间已经存在了")
+    store.add_room(user.family_id, name)
+    record_event(user.family_id, TYPE_SYSTEM, title=f"新建了房间「{name}」",
+                 body=f"操作人：{user.name}", actor=user.name)
+    return {"ok": True, "name": name}
+
+
+@router.put("/rooms/{room_name}")
+def rename_room(
+    room_name: str, req: RoomRenameRequest, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
+    """房间改名。该房间下的设备会一起改到新房间名下。"""
+    new_name = req.new_name.strip()
+    if not new_name:
+        raise HTTPException(status_code=400, detail="新房间名不能为空")
+    if len(new_name) > 12:
+        raise HTTPException(status_code=400, detail="房间名太长了，12 字以内")
+    _ensure_device_seeded(user.family_id)
+    store = get_device_store()
+    if room_name not in store.rooms_of(user.family_id):
+        raise HTTPException(status_code=404, detail="房间不存在")
+    if not store.rename_room(user.family_id, room_name, new_name):
+        raise HTTPException(status_code=409, detail=f"「{new_name}」已经是个房间了")
+    record_event(user.family_id, TYPE_SYSTEM,
+                 title=f"房间改名：{room_name} → {new_name}",
+                 body=f"操作人：{user.name}", actor=user.name)
+    return {"ok": True, "name": new_name}
+
+
+@router.delete("/rooms/{room_name}")
+def delete_room(
+    room_name: str, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
+    """删房间。里面有设备就拒绝，并说清楚还有几台。"""
+    _ensure_device_seeded(user.family_id)
+    store = get_device_store()
+    ok, reason = store.delete_room(user.family_id, room_name)
+    if not ok:
+        # 房间不存在 → 404；房间非空 → 409（是"当前状态不允许"，不是"找不到"）
+        status = 404 if reason == "房间不存在" else 409
+        raise HTTPException(status_code=status, detail=reason)
+    record_event(user.family_id, TYPE_SYSTEM, title=f"删除了房间「{room_name}」",
+                 body=f"操作人：{user.name}", actor=user.name)
+    return {"ok": True, "removed": room_name}
+
+
+@router.post("/devices")
+def create_device(
+    req: DeviceCreateRequest, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
+    """添加一台电器。"""
+    error = _validate_device_fields(req.name, req.room, req.device_type,
+                                    req.min_value, req.max_value, req.unit)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+
+    _ensure_device_seeded(user.family_id)
+    store = get_device_store()
+    if any(d.name == req.name.strip() for d in store.devices_of(user.family_id).values()):
+        # 重名必须拦：`_find_device` 是精确匹配优先，两台同名设备时
+        # AI 永远操作排在前面的那台，用户会觉得"我说了半天它总开另一盏"。
+        raise HTTPException(status_code=409,
+                            detail=f"「{req.name.strip()}」这个名字已经有一台设备了")
+
+    device = store.add(
+        user.family_id, name=req.name, room=req.room.strip(),
+        device_type=req.device_type,
+        min_value=req.min_value, max_value=req.max_value, unit=req.unit.strip(),
+        initial_value=req.initial_value,
+    )
+    record_event(user.family_id, TYPE_DEVICE,
+                 title=f"添加了设备「{device.name}」",
+                 body=f"位置：{device.room} · 操作人：{user.name}", actor=user.name)
+    return {"ok": True, "device": _device_admin_payload(device)}
+
+
+@router.put("/devices/{device_id}")
+def update_device(
+    device_id: str, req: DeviceUpdateRequest, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
+    """改设备（改名 / 换房间 / 调范围）。内置设备也能改。"""
+    _ensure_device_seeded(user.family_id)
+    store = get_device_store()
+    current = store.get(user.family_id, device_id)
+    if current is None:
+        # 不返回 403：403 等于告诉对方"这个 id 存在但不属于你"，是免费的枚举线索。
+        raise HTTPException(status_code=404, detail="设备不存在")
+
+    name = req.name if req.name is not None else current.name
+    room = req.room if req.room is not None else current.room
+    min_value = current.min_value if req.min_value is None else req.min_value
+    max_value = current.max_value if req.max_value is None else req.max_value
+    unit = current.unit if req.unit is None else req.unit
+    if req.clear_range:
+        min_value = max_value = None
+        unit = ""
+
+    error = _validate_device_fields(name, room, current.device_type,
+                                    min_value, max_value, unit)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+
+    if req.name is not None and req.name.strip() != current.name:
+        if any(d.name == req.name.strip() and d.device_id != device_id
+               for d in store.devices_of(user.family_id).values()):
+            raise HTTPException(status_code=409,
+                                detail=f"「{req.name.strip()}」这个名字已经有一台设备了")
+
+    updated = store.update(
+        user.family_id, device_id,
+        name=req.name, room=req.room.strip() if req.room is not None else None,
+        min_value=min_value, max_value=max_value,
+        unit=unit if req.clear_range else req.unit,
+        clear_range=req.clear_range,
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="设备不存在")
+    record_event(user.family_id, TYPE_DEVICE,
+                 title=f"修改了设备「{updated.name}」",
+                 body=f"位置：{updated.room} · 操作人：{user.name}", actor=user.name)
+    return {"ok": True, "device": _device_admin_payload(updated)}
+
+
+@router.delete("/devices/{device_id}")
+def delete_device(
+    device_id: str, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
+    """删设备。内置设备也能删（少爷明确要的）。
+
+    返回里带上"有几个场景还在用它"——删完之后那些场景会跳过这台设备，
+    不提前告知，用户会以为是场景坏了。
+    """
+    _ensure_device_seeded(user.family_id)
+    store = get_device_store()
+    device = store.get(user.family_id, device_id)
+    if device is None:
+        raise HTTPException(status_code=404, detail="设备不存在")
+
+    used_by = [
+        s.name for s in get_scene_store().scenes_of(user.family_id)
+        if any(a.get("device_id") == device_id for a in s.actions)
+    ]
+    store.delete(user.family_id, device_id)
+    record_event(user.family_id, TYPE_DEVICE,
+                 title=f"删除了设备「{device.name}」",
+                 body=f"位置：{device.room} · 操作人：{user.name}", actor=user.name)
+    return {"ok": True, "removed": device_id, "usedByScenes": used_by}
+
+
 class SceneRequest(BaseModel):
     """场景执行请求。"""
 
     confirmed: bool = False
-
 
 @router.post("/scenes/{scene_id}/activate")
 async def activate_scene(

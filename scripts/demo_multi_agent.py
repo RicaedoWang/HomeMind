@@ -153,7 +153,10 @@ async def main() -> None:
         def __init__(self, intents: list) -> None:
             self._intents = intents
 
-        async def parse(self, text: str) -> list:
+        async def parse(self, text: str, family_id: str | None = None) -> list:
+            # family_id 是 V1.3 加的：意图层要用本家庭的真实设备/房间词表参与匹配。
+            # 桩解析器直接返回结果，用不上它，但签名必须跟上——否则调用方一传
+            # 第三个参数就 TypeError，而这条路径只有 demo 脚本会走到，单测一个都碰不着。
             return self._intents
 
     on_intent = Intent(type=IntentType.DEVICE_CONTROL, confidence=0.95,

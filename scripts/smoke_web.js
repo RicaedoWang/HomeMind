@@ -157,6 +157,27 @@ function fakeFetch(url, options) {
   if (pathname.startsWith('/api/console/tasks/')) {
     return Promise.resolve(jsonResponse({ ok: true, task: {}, linked: [] }));
   }
+  if (pathname === '/api/console/device-types') {
+    return Promise.resolve(jsonResponse({
+      types: [
+        { value: 'light', label: '灯' }, { value: 'ac', label: '空调' },
+        { value: 'extra', label: '其他电器' },
+      ],
+    }));
+  }
+  if (pathname === '/api/console/devices') {
+    return Promise.resolve(jsonResponse({
+      ok: true,
+      device: { id: 'dev_test01', name: '咖啡机', room: '厨房', type: 'extra',
+        power: false, value: 3, minValue: 1, maxValue: 5, unit: '档', adjustable: true, builtin: false },
+    }));
+  }
+  if (pathname === '/api/console/rooms') {
+    return Promise.resolve(jsonResponse({ ok: true, name: '儿童房' }));
+  }
+  if (pathname.startsWith('/api/console/rooms/')) {
+    return Promise.resolve(jsonResponse({ ok: true, name: '影音室' }));
+  }
   if (pathname.startsWith('/api/console/devices/')) {
     return Promise.resolve(jsonResponse({ ok: true, message: '已执行', device: state.devices[0] }));
   }
@@ -382,6 +403,91 @@ async function main() {
   await tick(150);
   await expectRequest('我的页·习惯条目（遗忘 → 弹层确认）', '#page-me-habits [data-habit]',
     { confirm: true });
+
+  // ---- 4.5 设备与房间管理（V1.3）
+  // 这一段验的不是"按钮在不在"，而是"点了到底有没有发出创建请求"。
+  // 之前只有一个静态按钮、点了没反应时，光看渲染是看不出来的。
+  goPage('home'); await tick(80);
+
+  {
+    const before = hits.length;
+    const btn = doc.querySelector('#btn-add-device');
+    if (!btn) {
+      errors.push('设备区没有「添加电器」入口');
+    } else {
+      btn.click();
+      await tick(80);
+      const isOpen = doc.querySelector('#modal-mask').classList.contains('is-open');
+      const hasName = Boolean(doc.querySelector('#dev-name'));
+      const hasRoom = Boolean(doc.querySelector('#dev-room'));
+      const hasType = Boolean(doc.querySelector('#dev-type'));
+      if (!isOpen || !hasName || !hasRoom || !hasType) {
+        errors.push(`添加电器弹层不完整：open=${isOpen} name=${hasName} room=${hasRoom} type=${hasType}`);
+      }
+      // 类型下拉必须是后端给的清单，不能是空壳
+      const typeCount = doc.querySelectorAll('#dev-type option').length;
+      if (typeCount < 2) errors.push(`设备类型下拉只有 ${typeCount} 项，应该有后端清单`);
+
+      doc.querySelector('#dev-name').value = '咖啡机';
+      doc.querySelector('#dev-room').value = '厨房';
+      doc.querySelector('#dev-min').value = '1';
+      doc.querySelector('#dev-max').value = '5';
+      doc.querySelector('#dev-unit').value = '档';
+      doc.querySelector('#modal-ok').click();
+      await tick(140);
+
+      const posted = hits.slice(before).filter((h) => h.includes('/api/console/devices')
+        && !h.includes('/control'));
+      actions.push(['添加电器（填表提交）',
+        posted.length ? `OK → ${posted[0]}` : '** 没发出创建请求 **']);
+      if (!posted.length) errors.push('添加电器点了「添加」但没发 POST /api/console/devices');
+    }
+    // 关了再开下一个，避免弹层互相盖住
+    const cancel = doc.querySelector('#modal-cancel');
+    if (cancel) { cancel.click(); await tick(60); }
+  }
+
+  {
+    const btn = doc.querySelector('#btn-manage-devices');
+    if (!btn) {
+      errors.push('设备区没有「管理设备」入口');
+    } else {
+      btn.click();
+      await tick(100);
+      const rows = doc.querySelectorAll('#modal-desc .hm-manage__row');
+      actions.push(['管理设备（列出设备）',
+        rows.length ? `OK → ${rows.length} 台` : '** 一台设备都没列出来 **']);
+      if (!rows.length) errors.push('管理设备弹层没列出任何设备');
+      const cancel = doc.querySelector('#modal-cancel');
+      if (cancel) { cancel.click(); await tick(60); }
+    }
+  }
+
+  {
+    const before = hits.length;
+    const btn = doc.querySelector('#btn-manage-rooms');
+    if (!btn) {
+      errors.push('设备区没有「房间」入口');
+    } else {
+      btn.click();
+      await tick(100);
+      const newRoom = doc.querySelector('#room-new');
+      const addBtn = doc.querySelector('#room-add');
+      if (!newRoom || !addBtn) {
+        errors.push('房间管理弹层缺少新建房间的输入框或按钮');
+      } else {
+        newRoom.value = '儿童房';
+        addBtn.click();
+        await tick(140);
+        const posted = hits.slice(before).filter((h) => h.includes('/api/console/rooms'));
+        actions.push(['房间管理（新建房间）',
+          posted.length ? `OK → ${posted[0]}` : '** 没发出新建房间请求 **']);
+        if (!posted.length) errors.push('新建房间点了「添加」但没发 POST /api/console/rooms');
+      }
+      const cancel = doc.querySelector('#modal-cancel');
+      if (cancel) { cancel.click(); await tick(60); }
+    }
+  }
 
   // ---- 5. AI 面板
   doc.querySelector('#fab').click();

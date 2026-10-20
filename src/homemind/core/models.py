@@ -104,7 +104,16 @@ class ToolResult:
 
 @dataclass
 class DeviceState:
-    """设备状态（Mock 设备层的内存态，真实设备接入后由设备层维护）。"""
+    """设备状态。
+
+    历史上这是"Mock 设备层的内存态"，V1.3 起改为由 `DeviceStore`（SQLite）支撑——
+    因为用户要能自己添加/改名/删除设备，代码里的常量一旦成了唯一真相，
+    "删掉洗衣机"重启之后就复活了。内存态只是个快照，读写都要落库。
+
+    可调范围（`min_value`/`max_value`/`unit`）是 V1.3 加的：
+    用户自建的"咖啡机 3 档""加湿器 60%"需要知道自己能调到哪里，
+    否则 `set_value` 收多少都照收，界面也不知道该画什么刻度。
+    """
 
     device_id: str
     name: str
@@ -112,6 +121,21 @@ class DeviceState:
     device_type: str
     power: bool = False
     value: float | None = None  # 温度 / 亮度等可调数值
+    min_value: float | None = None
+    max_value: float | None = None
+    unit: str = ""
+    builtin: bool = False  # 内置种子设备：可以改、可以删，只用来标注来源
+
+    @property
+    def adjustable(self) -> bool:
+        """能不能调值。没给范围的设备只说开关，别说"调到 40%"。"""
+        return self.min_value is not None and self.max_value is not None
+
+    def clamp(self, value: float) -> float:
+        """把用户给的值夹进合法范围。范围缺失时不夹（老数据没范围）。"""
+        if self.min_value is None or self.max_value is None:
+            return value
+        return max(self.min_value, min(self.max_value, value))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -121,4 +145,9 @@ class DeviceState:
             "device_type": self.device_type,
             "power": self.power,
             "value": self.value,
+            "min_value": self.min_value,
+            "max_value": self.max_value,
+            "unit": self.unit,
+            "builtin": self.builtin,
+            "adjustable": self.adjustable,
         }

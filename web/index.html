@@ -142,6 +142,16 @@
         </section>
 
         <!-- 设备 -->
+        <!-- 设备工具条：V1.3 起用户能自己加电器、自己管房间。
+             放在设备区顶部而不是塞进设置页，是因为"我家没有这个电器"这件事
+             是站在设备列表前才想起来的。 -->
+        <div class="hm-devbar" id="devbar">
+          <button class="hm-devbar__btn hm-devbar__btn--main" id="btn-add-device" type="button">
+            <svg class="hm-ico hm-ico--sm"><use href="#i-plus"/></svg>添加电器
+          </button>
+          <button class="hm-devbar__btn" id="btn-manage-devices" type="button">管理设备</button>
+          <button class="hm-devbar__btn" id="btn-manage-rooms" type="button">房间</button>
+        </div>
         <div id="device-sections"></div>
 
         <!-- 摘要条 -->

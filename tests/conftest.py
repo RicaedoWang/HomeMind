@@ -25,19 +25,25 @@ os.environ.setdefault("HM_LOG_LEVEL", "ERROR")
 def _isolated_content_store(tmp_path):
     """每条用例用独立的内容库。
 
-    家庭与自建场景都是**可写**的（注册会建家、建场景会落库），
-    一旦走默认路径就是 `data/homemind_content.db`——那是用户真实数据。
-    测试写进去等于把人家的家改成测试用例的家，且再也说不清哪条是他自己的。
+    家庭、自建场景、设备与房间都是**可写**的（注册会建家、建场景会落库、
+    添加电器会写设备表），一旦走默认路径就是 `data/homemind_content.db`——
+    那是用户真实数据。测试写进去等于把人家的家改成测试用例的家，
+    且再也说不清哪条是他自己的。
 
     和 `auth.set_account_store` 是同一个套路：单例留了接缝，测试就换掉它。
+    设备是 V1.3 才落库的，接缝 `set_device_store` 与其它三个并列——
+    **新增可写存储必须同步加在这里**，否则测试会静默污染真实数据。
     """
     from homemind.auth.family_store import (
         FamilyStore, SceneStore, set_family_store, set_scene_store,
     )
+    from homemind.tools.device_store import DeviceStore, set_device_store
 
     db = str(tmp_path / "content.db")
     set_family_store(FamilyStore(db))
     set_scene_store(SceneStore(db))
+    set_device_store(DeviceStore(db))
     yield
     set_family_store(None)
     set_scene_store(None)
+    set_device_store(None)

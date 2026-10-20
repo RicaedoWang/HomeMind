@@ -965,6 +965,301 @@
       ${sliderHtml}`;
   }
 
+  // ---------------------------------------------------------- 设备与房间管理（V1.3）
+  //
+  // 为什么入口放在设备区顶部而不是设置页：
+  // "我家没有这个电器"这个念头，是站在设备列表前才会冒出来的。
+  // 藏进设置页的结果就是用户永远找不到它。
+
+  let deviceTypes = [];   // 类型清单来自后端，前端不硬编码，否则两边迟早对不上
+
+  async function loadDeviceTypes() {
+    if (deviceTypes.length) return deviceTypes;
+    try {
+      const res = await api('/api/console/device-types');
+      deviceTypes = res.types || [];
+    } catch {
+      // 拿不到清单也得让用户能加设备，退到兜底类型
+      deviceTypes = [{ value: 'extra', label: '其他电器' }];
+    }
+    return deviceTypes;
+  }
+
+  function currentRooms() {
+    // 房间以真实存在的设备为准（后端的房间表也含空房间，但这里给的是"能选的"）
+    const fromDevices = store.data.devices.map((d) => d.room);
+    return [...new Set(fromDevices)].filter(Boolean);
+  }
+
+  function roomFieldHtml(selected) {
+    const rooms = currentRooms();
+    const options = rooms.map((r) => `<option value="${esc(r)}"></option>`).join('');
+    return `
+      <label class="hm-field">
+        <span class="hm-field__label">房间</span>
+        <input class="hm-input" id="dev-room" list="dev-room-list" maxlength="12"
+               value="${esc(selected || rooms[0] || '')}" placeholder="客厅 / 儿童房 / 影音室…" />
+        <datalist id="dev-room-list">${options}</datalist>
+        <span class="hm-field__hint">选现有的，或者直接打一个新房间名</span>
+      </label>`;
+  }
+
+  function deviceFormHtml(device) {
+    const isEdit = Boolean(device);
+    const types = deviceTypes.map((t) =>
+      `<option value="${t.value}"${device && device.type === t.value ? ' selected' : ''}>${esc(t.label)}</option>`
+    ).join('');
+    return `
+      <div class="hm-editor">
+        <label class="hm-field">
+          <span class="hm-field__label">电器名称</span>
+          <input class="hm-input" id="dev-name" maxlength="20"
+                 value="${esc(isEdit ? device.name : '')}" placeholder="如「胶囊咖啡机」" />
+        </label>
+        ${roomFieldHtml(isEdit ? device.room : '')}
+        <label class="hm-field">
+          <span class="hm-field__label">类型（决定图标和能做什么）</span>
+          <select class="hm-input" id="dev-type"${isEdit ? ' disabled' : ''}>${types}</select>
+          ${isEdit ? '<span class="hm-field__hint">类型建好之后不让改：改了它就不是同一台设备了，删掉重加更清楚</span>' : ''}
+        </label>
+        <div class="hm-field">
+          <span class="hm-field__label">可调范围（留空 = 只能开关）</span>
+          <div class="hm-field__row">
+            <input class="hm-input" id="dev-min" type="number" placeholder="最小"
+                   value="${isEdit && device.minValue !== null ? device.minValue : ''}" />
+            <span class="hm-field__sep">—</span>
+            <input class="hm-input" id="dev-max" type="number" placeholder="最大"
+                   value="${isEdit && device.maxValue !== null ? device.maxValue : ''}" />
+            <input class="hm-input" id="dev-unit" maxlength="6" placeholder="单位"
+                   value="${esc(isEdit ? (device.unit || '') : '')}" />
+          </div>
+          <span class="hm-field__hint">填了范围才能说「调到 3 档」，否则只能开和关</span>
+        </div>
+      </div>`;
+  }
+
+  function readDeviceForm() {
+    const min = $('#dev-min').value.trim();
+    const max = $('#dev-max').value.trim();
+    return {
+      name: $('#dev-name').value.trim(),
+      room: $('#dev-room').value.trim(),
+      device_type: $('#dev-type').value,
+      min_value: min === '' ? null : Number(min),
+      max_value: max === '' ? null : Number(max),
+      unit: $('#dev-unit').value.trim(),
+    };
+  }
+
+  function validateDeviceForm(form) {
+    if (!form.name) { showToast('先给电器起个名字'); return false; }
+    if (!form.room) { showToast('得告诉我在哪个房间'); return false; }
+    if ((form.min_value === null) !== (form.max_value === null)) {
+      showToast('可调范围要填就两个都填'); return false;
+    }
+    if (form.min_value !== null && form.max_value !== null
+        && !(form.min_value < form.max_value)) {
+      showToast('最大值要大于最小值'); return false;
+    }
+    return true;
+  }
+
+  /** 添加 / 编辑设备。传 null 就是添加。 */
+  async function openDeviceEditor(device) {
+    const isEdit = Boolean(device);
+    await loadDeviceTypes();
+
+    openFormModal({
+      title: isEdit ? `编辑「${device.name}」` : '添加电器',
+      okText: isEdit ? '保存' : '添加',
+      html: deviceFormHtml(device),
+      onSubmit: async () => {
+        const form = readDeviceForm();
+        if (!validateDeviceForm(form)) return false;
+        try {
+          if (isEdit) {
+            // 类型不可改（后端也只接受这几个字段），所以这里不传
+            await api(`/api/console/devices/${device.id}`, {
+              name: form.name, room: form.room,
+              min_value: form.min_value, max_value: form.max_value, unit: form.unit,
+            }, 'PUT');
+            showToast(`已更新「${form.name}」`);
+          } else {
+            await api('/api/console/devices', form);
+            showToast(`已添加「${form.name}」，现在可以直接对它说话`);
+          }
+          await refresh();
+          return true;
+        } catch (err) {
+          // 后端的 detail 直接给用户看：「这个名字已经有一台设备了」比「409」有用得多
+          showToast(err.message || '保存失败');
+          return false;   // 填错一个字段就关弹窗，让人重填是最烦人的交互
+        }
+      },
+    });
+  }
+
+  /** 设备管理面板：列出全部设备，逐台可改可删。 */
+  async function openManageDevices() {
+    await loadDeviceTypes();
+    const typeLabel = (t) => (deviceTypes.find((x) => x.value === t) || {}).label || t;
+    const groups = new Map();
+    store.data.devices.forEach((d) => {
+      if (!groups.has(d.room)) groups.set(d.room, []);
+      groups.get(d.room).push(d);
+    });
+
+    const html = `
+      <div class="hm-manage">
+        ${[...groups.entries()].map(([room, list]) => `
+          <div class="hm-manage__group">
+            <div class="hm-manage__gtitle">${esc(room)}<span>${list.length} 台</span></div>
+            ${list.map((d) => `
+              <div class="hm-manage__row">
+                <div class="hm-manage__info">
+                  <b>${esc(d.name)}</b>
+                  <span>${esc(typeLabel(d.type))}${d.builtin ? ' · 预装' : ''}</span>
+                </div>
+                <button type="button" class="hm-manage__act" data-edit="${esc(d.id)}">编辑</button>
+                <button type="button" class="hm-manage__act is-danger" data-del="${esc(d.id)}">删除</button>
+              </div>`).join('')}
+          </div>`).join('')}
+        <p class="hm-manage__hint">预装设备也能删。删掉之后不会再自己长回来。</p>
+      </div>`;
+
+    openFormModal({
+      title: '管理设备',
+      okText: '关闭',
+      html,
+      onSubmit: async () => true,
+    });
+
+    // 事件用 onclick 赋值而不是 addEventListener：#modal-desc 是同一个元素，
+    // innerHTML 重设不会清掉它自己的监听，累加几次之后点一下会触发三遍。
+    $('#modal-desc').onclick = async (e) => {
+      const editId = e.target.dataset.edit;
+      const delId = e.target.dataset.del;
+      if (editId) {
+        const device = store.data.devices.find((d) => d.id === editId);
+        $('#modal-mask').classList.remove('is-open');
+        if (device) openDeviceEditor(device);
+        return;
+      }
+      if (delId) {
+        const device = store.data.devices.find((d) => d.id === delId);
+        if (!device) return;
+        // 不用 window.confirm：jsdom 没实现，前端冒烟会卡死；且它会盖在弹窗上面。
+        // 改成两次点击——第一次把文案换成"再点一次删除"，4 秒后复原。
+        if (!e.target.dataset.armed) {
+          e.target.dataset.armed = '1';
+          e.target.textContent = '再点一次';
+          setTimeout(() => {
+            if (!e.target) return;
+            e.target.textContent = '删除';
+            delete e.target.dataset.armed;
+          }, 4000);
+          return;
+        }
+        try {
+          const res = await api(`/api/console/devices/${delId}`, null, 'DELETE');
+          const used = res.usedByScenes || [];
+          showToast(used.length
+            ? `已删除「${device.name}」，${used.join('、')} 会跳过它`
+            : `已删除「${device.name}」`);
+          await refresh();
+          openManageDevices();   // 重新打开，列表才是新的
+        } catch (err) {
+          showToast(err.message || '删除失败');
+        }
+      }
+    };
+  }
+
+  /** 房间管理面板：新建、改名、删除。 */
+  function openManageRooms() {
+    const rooms = currentRooms();
+    const html = `
+      <div class="hm-manage">
+        <div class="hm-field">
+          <span class="hm-field__label">新建房间</span>
+          <div class="hm-field__row">
+            <input class="hm-input" id="room-new" maxlength="12" placeholder="如「儿童房」" />
+            <button type="button" class="hm-btn hm-btn--ghost hm-btn--sm" id="room-add">添加</button>
+          </div>
+        </div>
+        <div class="hm-manage__group">
+          ${rooms.map((room) => {
+            const count = store.data.devices.filter((d) => d.room === room).length;
+            return `
+              <div class="hm-manage__row">
+                <div class="hm-manage__info"><b>${esc(room)}</b><span>${count} 台设备</span></div>
+                <button type="button" class="hm-manage__act" data-rename="${esc(room)}">改名</button>
+                <button type="button" class="hm-manage__act is-danger" data-rmroom="${esc(room)}">删除</button>
+              </div>`;
+          }).join('')}
+        </div>
+        <p class="hm-manage__hint">房间里有设备时删不掉——先把设备移到别的房间。</p>
+      </div>`;
+
+    openFormModal({ title: '房间管理', okText: '关闭', html, onSubmit: async () => true });
+
+    $('#modal-desc').onclick = async (e) => {
+      const t = e.target;
+      if (t.id === 'room-add') {
+        const name = $('#room-new').value.trim();
+        if (!name) { showToast('先给房间起个名字'); return; }
+        try {
+          await api('/api/console/rooms', { name });
+          showToast(`已新建房间「${name}」`);
+          await refresh();
+          openManageRooms();
+        } catch (err) { showToast(err.message || '新建失败'); }
+        return;
+      }
+      if (t.dataset.rename) {
+        const old = t.dataset.rename;
+        const next = $('#room-rename-input') ? $('#room-rename-input').value.trim() : '';
+        if (!next) {
+          // 就地换成输入框，比再弹一层窗简单，也不会让人忘了自己在改哪个
+          t.dataset.rename = old;
+          t.textContent = '保存';
+          t.dataset.armed = '1';
+          const holder = document.createElement('input');
+          holder.className = 'hm-input hm-manage__rename';
+          holder.id = 'room-rename-input';
+          holder.value = old;
+          holder.maxLength = 12;
+          t.parentNode.insertBefore(holder, t);
+          return;
+        }
+        try {
+          await api(`/api/console/rooms/${encodeURIComponent(old)}`, { new_name: next }, 'PUT');
+          showToast(`「${old}」改成了「${next}」`);
+          await refresh();
+          openManageRooms();
+        } catch (err) { showToast(err.message || '改名失败'); }
+        return;
+      }
+      if (t.dataset.rmroom) {
+        const room = t.dataset.rmroom;
+        if (!t.dataset.armed) {
+          t.dataset.armed = '1';
+          t.textContent = '再点一次';
+          setTimeout(() => { if (t) { t.textContent = '删除'; delete t.dataset.armed; } }, 4000);
+          return;
+        }
+        try {
+          await api(`/api/console/rooms/${encodeURIComponent(room)}`, null, 'DELETE');
+          showToast(`已删除房间「${room}」`);
+          await refresh();
+          openManageRooms();
+        } catch (err) {
+          showToast(err.message || '删除失败');
+        }
+      }
+    };
+  }
+
   function renderDevices() {
     const host = $('#device-sections');
     host.innerHTML = '';
@@ -1771,6 +2066,13 @@
       btn.textContent = label;
     }
   }
+
+  // ---- 设备与房间管理（V1.3）
+  // 按钮在 index.html 里是静态的，但元素存在不代表能点——必须绑到真实动作。
+  // 冒烟用例断言的就是"点了有没有发请求"，光有按钮不算数。
+  $('#btn-add-device').addEventListener('click', () => openDeviceEditor(null));
+  $('#btn-manage-devices').addEventListener('click', () => openManageDevices());
+  $('#btn-manage-rooms').addEventListener('click', () => openManageRooms());
 
   // ---- 登录页的事件绑定（集中一处，免得散落在文件各处）
   $('#login-onekey').addEventListener('click', () => oneKeyLogin());
