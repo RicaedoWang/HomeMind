@@ -18,7 +18,7 @@ from ..config import Settings, get_settings
 from ..core.llm import get_llm_client
 from ..core.models import Intent, IntentType
 from ..core.trace import get_logger, span
-from .time_parser import parse_time_expr
+from .time_parser import describe_now, parse_time_expr, strip_time_tokens
 
 logger = get_logger("agent.intent")
 
@@ -198,6 +198,7 @@ def _extract_schedule_fields(text: str) -> dict[str, Any]:
         content = content.replace(word, "")
     content = re.sub(r"[，,。！!？?、：:\s]+", " ", content).strip(" 的我")
     # 去掉时间片段，避免内容里混入时间
+    content = strip_time_tokens(content) or content
     parsed, confidence = parse_time_expr(text)
     fields: dict[str, Any] = {"content": content or "提醒"}
     if parsed is not None:
@@ -258,7 +259,9 @@ class IntentParser:
             return None
 
         system = "你是智能家居助手的意图解析器。只输出 JSON，不要任何解释文字。"
-        prompt = f"""解析下面的用户输入，输出一个 JSON 数组，每个元素包含：
+        prompt = f"""{describe_now()}
+
+解析下面的用户输入，输出一个 JSON 数组，每个元素包含：
 - type: device_control / schedule / knowledge / memory_query / memory_write / chat
 - confidence: 0~1 之间的浮点数
 - entities: 对象，可包含这些字段
@@ -266,10 +269,17 @@ class IntentParser:
     room: 客厅 / 主卧 / 厨房 等
     action: turn_on / turn_off / set_value / query
     value: 数字（调温度时用）
-    content: 提醒内容（type=schedule 时必填）
-    scheduled_at: ISO8601 时间字符串（如 2026-10-14T09:00:00）
+    content: 提醒内容（type=schedule 时必填，只写"做什么"，不要带时间和"提醒我"这类词）
+    scheduled_at: ISO8601 绝对时间字符串
+
+**scheduled_at 必须用上面那行"现在"推算，禁止照抄任何示例日期。**
+例：现在若为 2026-10-20 13:06，则
+- "今日晚上七点" → 2026-10-20T19:00:00
+- "明天早上八点" → 2026-10-21T08:00:00
+- "下周一下午三点" → 2026-10-26T15:00:00
 
 判断要点：
+- 用户问"现在几点/今天几号/星期几" → type 用 chat（照常闲聊，不要编设备操作）
 - 用户想查看 **Agent 记住的习惯与偏好**（"我的习惯""记录了什么""看你记录"）→ type 用 memory_query
 - 用户想查看 **已安排的提醒/日程/待办**（"查看我的日程""今天有什么安排""我的提醒"）
   → type 用 schedule，**不要**判成 memory_query。两者都带"我的"，但一个问记忆、一个问日程，

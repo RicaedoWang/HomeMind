@@ -27,6 +27,7 @@ from .execution import apply_memory_to_arguments as _apply_memory_to_arguments
 from .execution import execute_task
 from .intent import IntentParser
 from .state import AgentState
+from .time_parser import describe_now, is_time_question
 
 logger = get_logger("agent.graph")
 
@@ -282,7 +283,9 @@ async def _llm_generate_answer(state: AgentState, facts: list[str]) -> str | Non
         "严格要求：只能基于下面给出的信息回答，不得编造任何没发生过的操作；"
         "如果执行失败，如实说明并给一句建议。"
     )
-    prompt = f"""用户说：{state['user_input']}
+    prompt = f"""{describe_now()}
+
+用户说：{state['user_input']}
 
 最近对话（旧→新）：
 {history_lines}
@@ -298,6 +301,11 @@ async def _llm_generate_answer(state: AgentState, facts: list[str]) -> str | Non
 - 若执行了操作，把结果用自然的话告诉他；用到了记忆就顺带说"按你之前的习惯"。
 - 若用户在询问记忆或习惯，根据"这个家庭的记忆"如实回答。
 - 若用户问"刚才/刚刚做了什么"，根据"最近对话"和"刚刚实际执行的结果"如实概括。
+- 若用户问现在几点、今天几号、星期几，**直接根据上面第一行的"现在"回答**，
+  不要说你不知道当前时间（模型没有系统时钟，这个时间是服务端算好喂给你的）。
+- **"最近对话"里出现的"即将创建…""确认请回复「确认」"只是询问确认，什么都没执行。**
+  只有"刚刚实际执行的结果"里明确列出的才算完成。历史里提过不等于已经做了，
+  没执行就直说没执行（例如"这句我没执行任何操作"），**绝不能因为历史里提过就宣称"已创建""已完成"**。
 - 若用户只是闲聊或提问，结合对话上下文正常回应，不要硬扯设备操作。"""
 
     result = await client.chat(prompt, system=system, max_tokens=200)
@@ -384,6 +392,11 @@ async def respond_node(state: AgentState, service: MemoryService) -> dict[str, A
             generated = await _llm_generate_answer(state, [])
             if generated:
                 return {"final_answer": generated}
+            # 规则模式（模型不可用）下问"现在几点"必须有答案：
+            # 模型有 prompt 里的时间可用，规则模式没有，全靠这一句模板兜底。
+            # 放在闲聊模板之前，否则用户会收到"我在听，可以说我喜欢…"这种鬼话。
+            if is_time_question(state.get("user_input", "")):
+                return {"final_answer": f"{describe_now()}。需要我帮你安排点什么吗？"}
             if recalled:
                 mems = "；".join(m["memory_value"] for m in recalled[:3])
                 return {"final_answer": f"我记得你之前说过：{mems}。需要我做什么？"}

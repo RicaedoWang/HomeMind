@@ -175,7 +175,9 @@ async def test_add_task_via_chat_creates_reminder(graph):
     confirmed = await _run(graph, "新加今日任务，晚上八点喂猫", confirmed=True)
     assert len(get_schedules()) == 1
     schedule = get_schedules()[0]
-    # "新加今日任务"这种操作残留不能混进提醒标题
-    assert schedule["content"] == "晚上八点喂猫"
+    # 操作残留（"新加今日任务"）和时间片段（"晚上八点"）都不该混进提醒标题。
+    # 时间已经由 scheduled_at 表达，标题里再留一份，回显就成了
+    # 「即将创建：晚上八点喂猫（2026-10-20T20:00:00）」—— 同一句话两个时间，看着像冲突。
+    assert schedule["content"] == "喂猫"
     assert schedule["scheduled_at"].endswith("T20:00:00")
     assert "已创建提醒" in confirmed["final_answer"]

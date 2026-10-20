@@ -869,6 +869,36 @@ class AssistantRequest(BaseModel):
     session_id: str = "console"
 
 
+# 上一轮"等待确认"的原始话术：session_id -> 用户的原话。
+#
+# 为什么要存原文：回显文案明确写着「确认请回复「确认」」，用户就真的回一个"确认"。
+# 但"确认"这两个字单独进来，意图解析判成 chat、tasks 为空——**什么都没执行**，
+# 而应答层翻到历史里那句"即将创建：去遛狗"，张口就来"任务已创建"。
+# 前端点按钮走的是"重发原句 + confirmed=true"，所以**按钮能用、手打不能**，
+# 同一件事两条路径两种结果，是最难查的那种 bug（实测于 2026-10-20）。
+# 存原文而不是存解析结果，是为了不引入第二份可执行的工具调用参数——
+# 参数只由解析层产出，这里只负责"把用户当时那句话再递一遍"。
+_PENDING_TEXT: dict[str, str] = {}
+
+# 只认"纯确认"的短词。不能宽到 "确认一下明天的天气" 也被当成确认指令。
+# 宁可让用户点按钮，也不要猜他想确认什么。
+_PURE_CONFIRM_WORDS = {
+    "确认", "确定", "是", "是的", "对", "对的", "好", "好的", "行", "可以",
+    "嗯", "同意", "执行", "继续", "ok", "okay", "yes", "y",
+}
+
+
+def _is_pure_confirm(text: str) -> bool:
+    """判断这句话是不是单纯回了个"确认"。"""
+    t = (text or "").strip().lower().rstrip("。.!！~ ")
+    return t in _PURE_CONFIRM_WORDS
+
+
+def reset_pending() -> None:
+    """清空待确认缓存（测试用：模块级字典不重置就不可复现）。"""
+    _PENDING_TEXT.clear()
+
+
 @router.post("/assistant")
 async def assistant(
     req: AssistantRequest, user: AuthUser = Depends(current_user)
@@ -889,12 +919,22 @@ async def assistant(
     # 会话键带家庭：换了家庭就是另一个会话，青岛家看不到深圳家聊过什么。
     # 请求体里的 session_id 不可信，一律忽略。
     session_id = f"console:{user.family_id}:{user.member_id}"
+
+    # 用户手打"确认"：把上一轮的原话捡回来重放。
+    # 这一步让"手打确认"与"点确认按钮"走完全相同的执行路径，
+    # 否则两条路一条能成一条静默失败（见 _PENDING_TEXT 上的注释）。
+    effective_text = req.text
+    if req.confirmed and _is_pure_confirm(req.text):
+        pending = _PENDING_TEXT.get(session_id)
+        if pending:
+            effective_text = pending
+
     memory = get_short_term_memory()
     await memory.append(session_id, "user", req.text)
     context = await memory.get_context(session_id)
 
     state = initial_state(
-        user_input=req.text,
+        user_input=effective_text,
         member_id=user.member_id,
         member_role=user.role,
         family_id=user.family_id,
@@ -905,6 +945,13 @@ async def assistant(
     )
     graph = build_agent_graph()
     result = await graph.ainvoke(state)
+
+    # 记下/清掉"待确认原文"：只有真的挂起了确认才有下一轮可重放的语义。
+    # 执行完就清掉，避免用户过一会儿随口一句"好"把十分钟前的操作给补执行了。
+    if result.get("requires_confirm"):
+        _PENDING_TEXT[session_id] = effective_text
+    else:
+        _PENDING_TEXT.pop(session_id, None)
 
     answer = result.get("final_answer", "")
     if answer:
