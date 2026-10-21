@@ -1,65 +1,64 @@
 <Slide style={{ width: 1280, height: 720, position: 'relative', overflow: 'hidden', background: '#0B1120', fontFamily: '微软雅黑' }}>
-    <Image src="assets/home_atmosphere.png" style={{ position: 'absolute', top: 0, left: 0, width: 1280, height: 720, objectFit: 'cover', opacity: 0.55 }} />
-    <Box style={{ position: 'absolute', top: 0, left: 0, width: 1280, height: 720, background: 'linear-gradient(105deg, rgba(11,17,32,0.97) 0%, rgba(11,17,32,0.90) 50%, rgba(11,17,32,0.66) 100%)' }} />
+    <Box style={{ height: 110, paddingLeft: 64, paddingRight: 64, paddingTop: 34, flexDirection: 'row', alignItems: 'center', gap: 18 }}>
+        <Box style={{ width: 4, height: 34, background: '#FB7185' }} />
+        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>复盘：三个坑，每个都值几百行代码</Text>
+    </Box>
 
-    <Box style={{ position: 'relative', zIndex: 1, width: 1280, height: 720, paddingLeft: 80, paddingRight: 80, paddingTop: 64, paddingBottom: 56, flexDirection: 'row', gap: 56 }}>
-        <Box style={{ width: 640, flexDirection: 'column', justifyContent: 'space-between' }}>
-            <Box>
-                <Text style={{ fontSize: 13, color: '#38BDF8', letterSpacing: 4, fontWeight: 700 }}>THANKS FOR LISTENING</Text>
-                <Text style={{ fontSize: 60, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.25, marginTop: 20, letterSpacing: 1 }}>
-                    谢谢，<br />欢迎提问
-                </Text>
-                <Box style={{ width: 60, height: 3, background: '#38BDF8', marginTop: 26 }} />
-            </Box>
-
-            <Box style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap', width: 620 }}>
-                <Box style={{ background: 'rgba(56,189,248,0.10)', border: '1px solid rgba(56,189,248,0.30)', borderRadius: 6, padding: '10px 18px' }}>
-                    <Text style={{ fontSize: 15, color: '#38BDF8' }}>LangGraph</Text>
-                </Box>
-                <Box style={{ background: 'rgba(56,189,248,0.10)', border: '1px solid rgba(56,189,248,0.30)', borderRadius: 6, padding: '10px 18px' }}>
-                    <Text style={{ fontSize: 15, color: '#38BDF8' }}>多 Agent 协同</Text>
-                </Box>
-                <Box style={{ background: 'rgba(56,189,248,0.10)', border: '1px solid rgba(56,189,248,0.30)', borderRadius: 6, padding: '10px 18px' }}>
-                    <Text style={{ fontSize: 15, color: '#38BDF8' }}>三层记忆</Text>
-                </Box>
-                <Box style={{ background: 'rgba(56,189,248,0.10)', border: '1px solid rgba(56,189,248,0.30)', borderRadius: 6, padding: '10px 18px' }}>
-                    <Text style={{ fontSize: 15, color: '#38BDF8' }}>家庭级多租户</Text>
-                </Box>
-                <Box style={{ background: 'rgba(56,189,248,0.10)', border: '1px solid rgba(56,189,248,0.30)', borderRadius: 6, padding: '10px 18px' }}>
-                    <Text style={{ fontSize: 15, color: '#38BDF8' }}>四层测试体系</Text>
-                </Box>
-                <Box style={{ background: 'rgba(56,189,248,0.10)', border: '1px solid rgba(56,189,248,0.30)', borderRadius: 6, padding: '10px 18px' }}>
-                    <Text style={{ fontSize: 15, color: '#38BDF8' }}>工具治理</Text>
+    <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', gap: 34 }}>
+        <Box style={{ width: 716, flexDirection: 'column', gap: 14 }}>
+            <Box style={{ flex: 1, flexDirection: 'row', gap: 20, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '20px 24px' }}>
+                <Text style={{ fontSize: 40, fontWeight: 700, color: 'rgba(251,113,133,0.55)', fontFamily: 'Consolas', lineHeight: 1, width: 44 }}>01</Text>
+                <Box style={{ width: 604 }}>
+                    <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC' }}>模型不知道今天是几号</Text>
+                    <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.65, marginTop: 8 }}>
+                        prompt 里写着"示例：2026-10-14T09:00:00"，模型把它当成了现在。<br />
+                        用户建"今日任务"，条目一落地就显示<span style={{ color: '#FB7185' }}>逾期 5 天</span>。
+                    </Text>
                 </Box>
             </Box>
 
-            <Box>
-                <Text style={{ fontSize: 21, color: 'rgba(248,250,252,0.72)', lineHeight: 1.85, width: 600 }}>
-                    这个项目最大的收获不是这些功能，<br />
-                    是学会了<span style={{ color: '#38BDF8', fontWeight: 700 }}>怎么证明它们真的能用</span>。
-                </Text>
-                <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.42)', marginTop: 22, letterSpacing: 1 }}>
-                    [ 你的名字 ] · 2026 年 10 月
-                </Text>
+            <Box style={{ flex: 1, flexDirection: 'row', gap: 20, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '20px 24px' }}>
+                <Text style={{ fontSize: 40, fontWeight: 700, color: 'rgba(251,113,133,0.55)', fontFamily: 'Consolas', lineHeight: 1, width: 44 }}>02</Text>
+                <Box style={{ width: 604 }}>
+                    <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC' }}>ok 配失败：报了成功，其实没动</Text>
+                    <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.65, marginTop: 8 }}>
+                        工具返回 <span style={{ fontFamily: 'Consolas' }}>success:false</span>，注册中心却仍是 <span style={{ fontFamily: 'Consolas' }}>ok:true</span>。<br />
+                        顺藤还揪出更狠的：自建门锁联动会<span style={{ color: '#FB7185' }}>反向把门锁上</span>，零报错。
+                    </Text>
+                </Box>
+            </Box>
+
+            <Box style={{ flex: 1, flexDirection: 'row', gap: 20, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '20px 24px' }}>
+                <Text style={{ fontSize: 40, fontWeight: 700, color: 'rgba(251,113,133,0.55)', fontFamily: 'Consolas', lineHeight: 1, width: 44 }}>03</Text>
+                <Box style={{ width: 604 }}>
+                    <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC' }}>我的测试把自己的数据删了</Text>
+                    <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.65, marginTop: 8 }}>
+                        评测每条用例都会重置设备库，而设备库没做隔离——<br />
+                        跑一次评测，<span style={{ color: '#FB7185' }}>你家里的 16 台设备全没了</span>。
+                    </Text>
+                </Box>
             </Box>
         </Box>
 
-        <Box style={{ width: 424, flexDirection: 'column', justifyContent: 'space-between' }}>
-            <Box style={{ background: 'rgba(56,189,248,0.10)', border: '1px solid rgba(56,189,248,0.32)', borderRadius: 12, padding: '28px 30px' }}>
-                <Text style={{ fontSize: 12, color: 'rgba(248,250,252,0.45)', letterSpacing: 2 }}>项目规模</Text>
-                <Text style={{ fontSize: 68, fontWeight: 700, color: '#38BDF8', fontFamily: 'Consolas', lineHeight: 1, marginTop: 10 }}>16,531</Text>
-                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.62)', marginTop: 14 }}>行 Python 代码 · 84 个文件</Text>
-                <Box style={{ height: 1, background: 'rgba(248,250,252,0.14)', marginTop: 18, marginBottom: 16 }} />
-                <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', lineHeight: 1.8 }}>
-                    76 次模块化提交<br />296 条单测 · 54 条评测全绿<br />一键自检 10 / 10
+        <Box style={{ width: 402, flexDirection: 'column', justifyContent: 'space-between' }}>
+            <Box style={{ background: 'rgba(251,113,133,0.08)', border: '1px solid rgba(251,113,133,0.40)', borderRadius: 10, padding: '26px 26px' }}>
+                <Text style={{ fontSize: 13, color: '#FB7185', letterSpacing: 2, fontWeight: 700 }}>共同点</Text>
+                <Text style={{ fontSize: 22, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.6, marginTop: 14 }}>
+                    都不是"功能没做"，<br />是"做了但错了，<br />而且测试没抓到"。
                 </Text>
             </Box>
 
-            <Box style={{ background: '#16223A', border: '1px solid rgba(248,250,252,0.12)', borderRadius: 12, padding: '24px 30px' }}>
-                <Text style={{ fontSize: 12, color: 'rgba(248,250,252,0.42)', letterSpacing: 2 }}>代码可查</Text>
-                <Text style={{ fontSize: 16, color: '#F8FAFC', marginTop: 10, fontFamily: 'Consolas' }}>github.com/RicaedoWang</Text>
-                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.62)', marginTop: 6, fontFamily: 'Consolas' }}>/HomeMind</Text>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '26px 26px' }}>
+                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.70)', lineHeight: 1.85 }}>
+                    所以后来立了条规矩：<br />
+                    <span style={{ color: '#38BDF8' }}>修完一个 bug，必须补一条能复现它的用例，并做反向验证</span>——把修复改回去，确认那条用例真的会红。
+                </Text>
             </Box>
         </Box>
+    </Box>
+
+    <Box style={{ height: 64, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居 AI 管家</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>13 / 15</Text>
     </Box>
 </Slide>

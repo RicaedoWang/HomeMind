@@ -1,87 +1,63 @@
 <Slide style={{ width: 1280, height: 720, position: 'relative', overflow: 'hidden', background: '#0B1120', fontFamily: '微软雅黑' }}>
     <Box style={{ height: 110, paddingLeft: 64, paddingRight: 64, paddingTop: 34, flexDirection: 'row', alignItems: 'center', gap: 18 }}>
         <Box style={{ width: 4, height: 34, background: '#38BDF8' }} />
-        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>一句"打开卧室灯"，中间走了六步</Text>
+        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>智能体分工与协作</Text>
+        <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.42)', marginTop: 8 }}>不是多个模型聊天，是职责隔离 + 最小权限</Text>
     </Box>
 
-    <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', gap: 44 }}>
-        <Box style={{ width: 668, flexDirection: 'column', gap: 10 }}>
-            <Box style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 16, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 8, paddingLeft: 18, paddingRight: 18 }}>
-                <Text style={{ fontSize: 15, color: 'rgba(56,189,248,0.60)', fontFamily: 'Consolas', fontWeight: 700, width: 26 }}>01</Text>
-                <Box style={{ width: 590 }}>
-                    <Text style={{ fontSize: 19, fontWeight: 700, color: '#F8FAFC' }}>recall_memory <span style={{ fontSize: 15, color: 'rgba(248,250,252,0.50)', fontWeight: 400 }}>记忆召回</span></Text>
-                    <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', marginTop: 5 }}>三层加权召回，权限在这一步就过滤</Text>
-                </Box>
+    <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'column', gap: 22, justifyContent: 'center' }}>
+        <Box style={{ flexDirection: 'row', gap: 14, alignItems: 'stretch' }}>
+            <Box style={{ flex: 1, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '20px 18px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, letterSpacing: 1 }}>意图识别</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 12 }}>parse_intent</Text>
+                <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', lineHeight: 1.6, marginTop: 8 }}>规则 + LLM 双模<br />识别 7 种意图</Text>
             </Box>
-
-            <Box style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 16, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 8, paddingLeft: 18, paddingRight: 18 }}>
-                <Text style={{ fontSize: 15, color: 'rgba(56,189,248,0.60)', fontFamily: 'Consolas', fontWeight: 700, width: 26 }}>02</Text>
-                <Box style={{ width: 590 }}>
-                    <Text style={{ fontSize: 19, fontWeight: 700, color: '#F8FAFC' }}>parse_intent <span style={{ fontSize: 15, color: 'rgba(248,250,252,0.50)', fontWeight: 400 }}>意图解析</span></Text>
-                    <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', marginTop: 5 }}>注入当前时间 + 读本家庭词表，规则优先、模型兜底</Text>
-                </Box>
+            <Box style={{ width: 22, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ fontSize: 20, color: 'rgba(248,250,252,0.30)', fontFamily: 'Consolas' }}>→</Text>
             </Box>
-
-            <Box style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 16, background: 'rgba(251,113,133,0.08)', border: '1px solid rgba(251,113,133,0.42)', borderRadius: 8, paddingLeft: 18, paddingRight: 18 }}>
-                <Text style={{ fontSize: 15, color: 'rgba(251,113,133,0.75)', fontFamily: 'Consolas', fontWeight: 700, width: 26 }}>03</Text>
-                <Box style={{ width: 590 }}>
-                    <Text style={{ fontSize: 19, fontWeight: 700, color: '#F8FAFC' }}>safety_gate <span style={{ fontSize: 15, color: 'rgba(248,250,252,0.50)', fontWeight: 400 }}>安全护栏</span></Text>
-                    <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', marginTop: 5 }}>高危确认 / 创建回显 / 有歧义就反问</Text>
-                </Box>
+            <Box style={{ flex: 1, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '20px 18px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, letterSpacing: 1 }}>知识检索</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 12 }}>knowledge_agent</Text>
+                <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', lineHeight: 1.6, marginTop: 8 }}>说明书语义召回<br />用户可导入</Text>
             </Box>
-
-            <Box style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 16, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 8, paddingLeft: 18, paddingRight: 18 }}>
-                <Text style={{ fontSize: 15, color: 'rgba(56,189,248,0.60)', fontFamily: 'Consolas', fontWeight: 700, width: 26 }}>04</Text>
-                <Box style={{ width: 590 }}>
-                    <Text style={{ fontSize: 19, fontWeight: 700, color: '#F8FAFC' }}>execute_tools <span style={{ fontSize: 15, color: 'rgba(248,250,252,0.50)', fontWeight: 400 }}>工具执行</span></Text>
-                    <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', marginTop: 5 }}>超时 / 重试 / 熔断 / 幂等，业务 handler 只管干活</Text>
-                </Box>
+            <Box style={{ width: 22, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ fontSize: 20, color: 'rgba(248,250,252,0.30)', fontFamily: 'Consolas' }}>→</Text>
             </Box>
-
-            <Box style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 16, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 8, paddingLeft: 18, paddingRight: 18 }}>
-                <Text style={{ fontSize: 15, color: 'rgba(56,189,248,0.60)', fontFamily: 'Consolas', fontWeight: 700, width: 26 }}>05</Text>
-                <Box style={{ width: 590 }}>
-                    <Text style={{ fontSize: 19, fontWeight: 700, color: '#F8FAFC' }}>respond <span style={{ fontSize: 15, color: 'rgba(248,250,252,0.50)', fontWeight: 400 }}>应答生成</span></Text>
-                    <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', marginTop: 5 }}>工具结果当确定事实喂进去，模型只负责润色</Text>
-                </Box>
+            <Box style={{ flex: 1, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '20px 18px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, letterSpacing: 1 }}>工具调用</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 12 }}>device / schedule</Text>
+                <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', lineHeight: 1.6, marginTop: 8 }}>设备控制 + 日程<br />各有工具白名单</Text>
             </Box>
-
-            <Box style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 16, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 8, paddingLeft: 18, paddingRight: 18 }}>
-                <Text style={{ fontSize: 15, color: 'rgba(56,189,248,0.60)', fontFamily: 'Consolas', fontWeight: 700, width: 26 }}>06</Text>
-                <Box style={{ width: 590 }}>
-                    <Text style={{ fontSize: 19, fontWeight: 700, color: '#F8FAFC' }}>write_memory <span style={{ fontSize: 15, color: 'rgba(248,250,252,0.50)', fontWeight: 400 }}>记忆写入</span></Text>
-                    <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', marginTop: 5 }}>语义查重，同主题覆盖并留痕（版本 +1）</Text>
-                </Box>
+            <Box style={{ width: 22, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ fontSize: 20, color: 'rgba(248,250,252,0.30)', fontFamily: 'Consolas' }}>→</Text>
+            </Box>
+            <Box style={{ flex: 1, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '20px 18px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, letterSpacing: 1 }}>结果生成</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 12 }}>respond_node</Text>
+                <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', lineHeight: 1.6, marginTop: 8 }}>整合工具结果<br />生成应答 + 记忆回执</Text>
             </Box>
         </Box>
 
-        <Box style={{ width: 440, flexDirection: 'column', gap: 18, justifyContent: 'center' }}>
-            <Box style={{ background: 'rgba(251,113,133,0.08)', border: '1px solid rgba(251,113,133,0.40)', borderRadius: 10, padding: '24px 26px' }}>
-                <Text style={{ fontSize: 13, color: '#FB7185', letterSpacing: 2, fontWeight: 700 }}>顺序就是设计</Text>
-                <Text style={{ fontSize: 19, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.6, marginTop: 12 }}>
-                    护栏排在执行之前——<br />这一行顺序决定了会不会误操作。
+        <Box style={{ flexDirection: 'row', gap: 20 }}>
+            <Box style={{ flex: 1, background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.30)', borderRadius: 10, padding: '18px 22px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', letterSpacing: 2, fontWeight: 700 }}>协作流程</Text>
+                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.72)', lineHeight: 1.7, marginTop: 8 }}>
+                    一句话进来 → parse_intent 拆意图 → Supervisor 按「意图 + 白名单」分派<br />
+                    → 子 Agent 并发执行、失败隔离 → respond_node 汇总应答
                 </Text>
             </Box>
-
-            <Box style={{ background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '24px 26px' }}>
-                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.72)', lineHeight: 1.85 }}>
-                    第 2 步做两件容易被忽略的事：<br />
-                    <span style={{ color: '#38BDF8' }}>·</span> 把"现在"注入进去（大模型没有系统时钟）<br />
-                    <span style={{ color: '#38BDF8' }}>·</span> 读这个家真实的设备名（你自建的"咖啡机"才听得懂）
-                </Text>
-            </Box>
-
-            <Box style={{ background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '24px 26px' }}>
-                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.72)', lineHeight: 1.85 }}>
-                    第 5 步不让模型自由发挥：<br />
-                    工具报了什么，就说什么。禁止因为"历史里提过"就说已完成。
+            <Box style={{ flex: 1, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '18px 22px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', letterSpacing: 2, fontWeight: 700 }}>关键设计</Text>
+                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.72)', lineHeight: 1.7, marginTop: 8 }}>
+                    最小权限（白名单）+ 失败隔离 + 执行前冲突检测。<br />
+                    安全护栏仍是唯一节点，多 Agent 没有削弱它。
                 </Text>
             </Box>
         </Box>
     </Box>
 
     <Box style={{ height: 64, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居多智能体中枢</Text>
-        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>05 / 13</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居 AI 管家</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>05 / 15</Text>
     </Box>
 </Slide>

@@ -1,68 +1,49 @@
 <Slide style={{ width: 1280, height: 720, position: 'relative', overflow: 'hidden', background: '#0B1120', fontFamily: '微软雅黑' }}>
     <Box style={{ height: 110, paddingLeft: 64, paddingRight: 64, paddingTop: 34, flexDirection: 'row', alignItems: 'center', gap: 18 }}>
         <Box style={{ width: 4, height: 34, background: '#38BDF8' }} />
-        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>我怎么证明它真的能跑</Text>
+        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>能力四 · 查得到</Text>
+        <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.42)', marginTop: 8 }}>设备说明书，问啥答啥</Text>
     </Box>
 
-    <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'column' }}>
-        <Box style={{ flexDirection: 'row', gap: 34, justifyContent: 'space-between' }}>
-            <Box style={{ width: 250 }}>
-                <Text style={{ fontSize: 84, fontWeight: 700, color: '#38BDF8', fontFamily: 'Consolas', lineHeight: 1 }}>296</Text>
-                <Text style={{ fontSize: 19, fontWeight: 700, color: '#F8FAFC', marginTop: 10 }}>条单元测试</Text>
-                <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', lineHeight: 1.65, marginTop: 7 }}>
-                    快、确定性、不联网，30 秒跑完
-                </Text>
-            </Box>
-            <Box style={{ width: 250 }}>
-                <Text style={{ fontSize: 84, fontWeight: 700, color: '#F8FAFC', fontFamily: 'Consolas', lineHeight: 1 }}>54</Text>
-                <Text style={{ fontSize: 19, fontWeight: 700, color: '#F8FAFC', marginTop: 10 }}>条端到端评测</Text>
-                <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', lineHeight: 1.65, marginTop: 7 }}>
-                    安全红线一票否决，失败即整体不合格
-                </Text>
-            </Box>
-            <Box style={{ width: 250 }}>
-                <Text style={{ fontSize: 84, fontWeight: 700, color: '#F8FAFC', fontFamily: 'Consolas', lineHeight: 1 }}>43</Text>
-                <Text style={{ fontSize: 19, fontWeight: 700, color: '#F8FAFC', marginTop: 10 }}>项端到端验收</Text>
-                <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', lineHeight: 1.65, marginTop: 7 }}>
-                    真起服务 + 真实 JWT，走完整登录链路
-                </Text>
-            </Box>
-            <Box style={{ width: 250 }}>
-                <Text style={{ fontSize: 84, fontWeight: 700, color: '#F8FAFC', fontFamily: 'Consolas', lineHeight: 1 }}>32</Text>
-                <Text style={{ fontSize: 19, fontWeight: 700, color: '#F8FAFC', marginTop: 10 }}>项前端冒烟</Text>
-                <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', lineHeight: 1.65, marginTop: 7 }}>
-                    无头浏览器逐个点，没发请求就算失败
+    <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', gap: 48 }}>
+        <Box style={{ width: 500, justifyContent: 'center' }}>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '26px 26px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', letterSpacing: 2, fontWeight: 700 }}>场景</Text>
+                <Box style={{ background: 'rgba(248,250,252,0.06)', borderRadius: 8, padding: '14px 18px', marginTop: 18 }}>
+                    <Text style={{ fontSize: 20, color: 'rgba(248,250,252,0.75)' }}>你问：「空调过滤网多久洗一次？」</Text>
+                </Box>
+                <Text style={{ fontSize: 20, color: 'rgba(248,250,252,0.50)', textAlign: 'center', marginTop: 14, marginBottom: 14 }}>↓</Text>
+                <Box style={{ background: 'rgba(56,189,248,0.10)', borderRadius: 8, padding: '14px 18px' }}>
+                    <Text style={{ fontSize: 21, color: '#F8FAFC' }}>它从你导入的说明书里召回答案</Text>
+                </Box>
+                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.55)', lineHeight: 1.7, marginTop: 18 }}>
+                    哪怕你问"过滤网"、原文写"滤网"，<br />
+                    字面不重合，语义也能对上。
                 </Text>
             </Box>
         </Box>
 
-        <Box style={{ height: 1, background: 'rgba(248,250,252,0.12)', marginTop: 26, marginBottom: 26 }} />
-
-        <Box style={{ flex: 1, flexDirection: 'row', gap: 40 }}>
-            <Box style={{ width: 700, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '24px 28px' }}>
-                <Text style={{ fontSize: 13, color: '#38BDF8', letterSpacing: 2, fontWeight: 700 }}>这四层不是重复劳动</Text>
-                <Text style={{ fontSize: 19, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.7, marginTop: 14 }}>
-                    单测用依赖注入<span style={{ color: '#38BDF8' }}>旁路掉了认证</span>，所以 JWT 中间件、静态站点托管、跨账号切换它一次都没跑过——只能靠端到端验收兜。
-                </Text>
-                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.58)', lineHeight: 1.75, marginTop: 12 }}>
-                    反之端到端只覆盖主路径，边界还得靠单测。各抓不同的东西，缺一层就有盲区。
-                </Text>
+        <Box style={{ width: 620, flexDirection: 'column', gap: 16, justifyContent: 'center' }}>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(56,189,248,0.22)', borderRadius: 10, padding: '20px 24px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, letterSpacing: 1 }}>决策 1</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 8 }}>知识库从"内置 5 条"变成"用户可导入"</Text>
+                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.58)', lineHeight: 1.7, marginTop: 8 }}>内置的通用常识当兜底，你自己家的说明书自己导——按家庭隔离，互不串。</Text>
             </Box>
-
-            <Box style={{ width: 376, background: 'rgba(251,113,133,0.08)', border: '1px solid rgba(251,113,133,0.38)', borderRadius: 10, padding: '24px 26px' }}>
-                <Text style={{ fontSize: 13, color: '#FB7185', letterSpacing: 2, fontWeight: 700 }}>一个真实教训</Text>
-                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.72)', lineHeight: 1.8, marginTop: 14 }}>
-                    给解析器加参数时改了 <span style={{ fontFamily: 'Consolas', color: '#FB7185' }}>src/</span> 和 <span style={{ fontFamily: 'Consolas', color: '#FB7185' }}>tests/</span>，漏了脚本里的桩实现——
-                </Text>
-                <Text style={{ fontSize: 17, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.8, marginTop: 10 }}>
-                    单测全绿、评测全绿，只有自检里"跑真脚本"那一项红着。
-                </Text>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(56,189,248,0.22)', borderRadius: 10, padding: '20px 24px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, letterSpacing: 1 }}>决策 2</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 8 }}>语义召回，不是字面匹配</Text>
+                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.58)', lineHeight: 1.7, marginTop: 8 }}>本地 embedding 把语义相近的段落找出来，字面零重合也能中。</Text>
+            </Box>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(56,189,248,0.22)', borderRadius: 10, padding: '20px 24px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, letterSpacing: 1 }}>决策 3</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 8 }}>查不到就说查不到</Text>
+                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.58)', lineHeight: 1.7, marginTop: 8 }}>低相关的段落被阈值过滤掉，不硬编——宁可说"没查到"，不给你驴唇不对马嘴的答案。</Text>
             </Box>
         </Box>
     </Box>
 
     <Box style={{ height: 64, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居多智能体中枢</Text>
-        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>10 / 13</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居 AI 管家</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>10 / 15</Text>
     </Box>
 </Slide>

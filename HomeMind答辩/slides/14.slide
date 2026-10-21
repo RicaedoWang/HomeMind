@@ -1,0 +1,54 @@
+<Slide style={{ width: 1280, height: 720, position: 'relative', overflow: 'hidden', background: '#0B1120', fontFamily: '微软雅黑' }}>
+    <Box style={{ height: 110, paddingLeft: 64, paddingRight: 64, paddingTop: 34, flexDirection: 'row', alignItems: 'center', gap: 18 }}>
+        <Box style={{ width: 4, height: 34, background: '#38BDF8' }} />
+        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>现在还不能做什么</Text>
+    </Box>
+
+    <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', gap: 48 }}>
+        <Box style={{ width: 320, justifyContent: 'center', background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '32px 28px' }}>
+            <Text style={{ fontSize: 30, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.5 }}>
+                主动说清楚<br />哪里没做好
+            </Text>
+            <Box style={{ width: 56, height: 3, background: '#38BDF8', marginTop: 24 }} />
+            <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.58)', lineHeight: 1.85, marginTop: 22 }}>
+                被问出来才承认，<br />比主动标注难看一百倍。<br />下面这些，我都能说清"为什么还没做"。
+            </Text>
+        </Box>
+
+        <Box style={{ width: 720, flexDirection: 'column', gap: 16 }}>
+            <Box style={{ flex: 1, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '20px 26px' }}>
+                <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <Text style={{ fontSize: 18, fontWeight: 700, color: '#F8FAFC' }}>还没做的</Text>
+                    <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.42)' }}>规划里有，时间不够</Text>
+                </Box>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.8, marginTop: 10 }}>
+                    语音入口 ｜ 真实设备接入（现在跑的是模拟设备）｜ 主动服务 ｜ 多轮指代消解——说"把它关了"，它还不知道"它"是哪台
+                </Text>
+            </Box>
+
+            <Box style={{ flex: 1, background: 'rgba(56,189,248,0.06)', border: '1px solid rgba(56,189,248,0.25)', borderRadius: 10, padding: '20px 26px' }}>
+                <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <Text style={{ fontSize: 18, fontWeight: 700, color: '#38BDF8' }}>这轮从"降级"补成"真跑"</Text>
+                </Box>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.62)', lineHeight: 1.8, marginTop: 10 }}>
+                    Redis 真跑（停了能自动降级）｜ 语义召回接本地 embedding ｜ 知识库从内置 5 条变用户可导入
+                </Text>
+            </Box>
+
+            <Box style={{ flex: 1, background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.35)', borderRadius: 10, padding: '20px 26px' }}>
+                <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <Text style={{ fontSize: 18, fontWeight: 700, color: '#38BDF8' }}>下一步优先级</Text>
+                </Box>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.66)', lineHeight: 1.8, marginTop: 10 }}>
+                    ① 把评测红线挂到 CI，让"能拦住回归"变成仓库里可查的事实<br />
+                    ② 接真实 ESP32 设备，让"说一句话灯就亮"从模拟变真事
+                </Text>
+            </Box>
+        </Box>
+    </Box>
+
+    <Box style={{ height: 64, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居 AI 管家</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>14 / 15</Text>
+    </Box>
+</Slide>

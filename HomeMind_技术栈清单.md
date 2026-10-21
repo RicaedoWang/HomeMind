@@ -126,8 +126,9 @@
 | MySQL | **代码里零实现**（无 pymysql、无分支） | 只有 `sql/init.sql` 的 DDL，仅用于「表语义对齐」 | ⛔ 未接入，也不打算为此接入 |
 | Milvus | 向量数据库 | 三容器（etcd + minio + milvus）吃 4G+ 内存，为 4,500 条向量上它是负收益 | ⛔ **刻意不接**（理由见下） |
 | **fastembed（ONNX）** | 本地 embedding | bge-small-zh-v1.5，512 维，90MB；单次推理 **5.6ms**，不依赖 PyTorch | ✅ 实际在用 |
-| **字符 bigram Jaccard** | 记忆**去重** + embedding 不可用时的召回降级 | 见下「为什么去重不用向量」 | ✅ 实际在用 |
-| **numpy 暴力余弦** | 真向量检索的预留路径 | `semantic.py` 留了 `embed_fn` 钩子，传函数进去就是真向量；实测 4,500 条 512 维 **0.13ms**，5 万条 1.76ms | ⚠️ 接口就绪，未接模型 |
+| **字符 bigram Jaccard** | 记忆**去重** + 记忆/知识库 embedding 不可用时的召回降级 | 见下「为什么去重不用向量」 | ✅ 实际在用 |
+| **numpy 暴力余弦** | 语义记忆召回 + 知识库检索 | 4,500 条 512 维实测 **0.13ms**，5 万条 1.76ms；向量阈值 0.4 过滤无关噪声 | ✅ 实际在用 |
+| **`knowledge_doc` 表** | 知识库（用户导入的说明书） | family_id 隔离 + 空行切块 + content_hash 去重 + embedding BLOB（float32 512 维） | ✅ 实际在用 |
 
 **为什么这次开 WAL 值 180 倍，比接 MySQL 值**：
 

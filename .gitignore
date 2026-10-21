@@ -28,3 +28,6 @@ HomeMind答辩/.cache/
 
 # Office / WPS 打开文件时生成的临时锁文件
 ~$*
+
+# PPT 生成过程的临时备份
+HomeMind答辩/*_备份_*.pptx

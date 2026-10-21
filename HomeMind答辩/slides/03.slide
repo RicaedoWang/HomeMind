@@ -1,51 +1,52 @@
 <Slide style={{ width: 1280, height: 720, position: 'relative', overflow: 'hidden', background: '#0B1120', fontFamily: '微软雅黑' }}>
     <Box style={{ height: 110, paddingLeft: 64, paddingRight: 64, paddingTop: 34, flexDirection: 'row', alignItems: 'center', gap: 18 }}>
         <Box style={{ width: 4, height: 34, background: '#38BDF8' }} />
-        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>所以我给自己定了三条死规矩</Text>
+        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>项目目标：听得懂 · 记得住 · 管得住</Text>
     </Box>
 
     <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', gap: 52 }}>
         <Box style={{ width: 340, justifyContent: 'center' }}>
             <Text style={{ fontSize: 96, fontWeight: 700, color: 'rgba(56,189,248,0.22)', fontFamily: 'Consolas', lineHeight: 1 }}>03</Text>
             <Text style={{ fontSize: 30, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.5, marginTop: 18 }}>
-                每条规矩<br />都对应上面<br />一个痛点
+                三个能力<br />各解决<br />一个痛点
             </Text>
             <Box style={{ width: 56, height: 3, background: '#38BDF8', marginTop: 26 }} />
             <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.55)', lineHeight: 1.8, marginTop: 22, width: 300 }}>
-                这三句话写进了 README 第一段，<br />也写进了每一层的实现里。
+                业务目标：三个能力对三个痛点。<br />
+                技术目标：记忆改变行为、<br />安全是硬约束。
             </Text>
         </Box>
 
         <Box style={{ width: 760, flexDirection: 'column', gap: 22 }}>
             <Box style={{ flex: 1, flexDirection: 'row', gap: 18, alignItems: 'center', background: '#16223A', border: '1px solid rgba(56,189,248,0.22)', borderRadius: 10, padding: '26px 26px' }}>
-                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, width: 44, letterSpacing: 1 }}>R-01</Text>
+                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, width: 44, letterSpacing: 1 }}>A-1</Text>
                 <Box style={{ width: 668 }}>
-                    <Text style={{ fontSize: 24, fontWeight: 700, color: '#F8FAFC' }}>听得懂人话</Text>
+                    <Text style={{ fontSize: 24, fontWeight: 700, color: '#F8FAFC' }}>听得懂</Text>
                     <Text style={{ fontSize: 18, color: 'rgba(248,250,252,0.62)', lineHeight: 1.7, marginTop: 9 }}>
-                        规则引擎与大模型双模解析，<span style={{ color: '#38BDF8' }}>任一层都能独立跑完整条链路</span>。<br />
-                        模型挂了不是降级成"抱歉我不懂"，是照常能开关灯。
+                        听懂话外之意：<span style={{ color: '#38BDF8' }}>"提醒关灯"和"现在关灯"是两回事</span>。<br />
+                        说不清的时候，反问一句，而不是闷头替你决定。
                     </Text>
                 </Box>
             </Box>
 
             <Box style={{ flex: 1, flexDirection: 'row', gap: 18, alignItems: 'center', background: '#16223A', border: '1px solid rgba(56,189,248,0.22)', borderRadius: 10, padding: '26px 26px' }}>
-                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, width: 44, letterSpacing: 1 }}>R-02</Text>
+                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, width: 44, letterSpacing: 1 }}>A-2</Text>
                 <Box style={{ width: 668 }}>
-                    <Text style={{ fontSize: 24, fontWeight: 700, color: '#F8FAFC' }}>记得住习惯</Text>
+                    <Text style={{ fontSize: 24, fontWeight: 700, color: '#F8FAFC' }}>记得住</Text>
                     <Text style={{ fontSize: 18, color: 'rgba(248,250,252,0.62)', lineHeight: 1.7, marginTop: 9 }}>
-                        三层记忆 + 加权召回。<span style={{ color: '#38BDF8' }}>召回结果会反向改写工具参数</span>——<br />
-                        说"把空调打开"，它会按你记下的偏好直接开到 26 度。
+                        记住你的习惯，<span style={{ color: '#38BDF8' }}>让记忆真的改变行为</span>——<br />
+                        说"开空调"，它直接按你记下的 26 度来。
                     </Text>
                 </Box>
             </Box>
 
             <Box style={{ flex: 1, flexDirection: 'row', gap: 18, alignItems: 'center', background: 'rgba(251,113,133,0.08)', border: '1px solid rgba(251,113,133,0.42)', borderRadius: 10, padding: '26px 26px' }}>
-                <Text style={{ fontSize: 13, color: '#FB7185', fontFamily: 'Consolas', fontWeight: 700, width: 44, letterSpacing: 1 }}>R-03</Text>
+                <Text style={{ fontSize: 13, color: '#FB7185', fontFamily: 'Consolas', fontWeight: 700, width: 44, letterSpacing: 1 }}>A-3</Text>
                 <Box style={{ width: 668 }}>
-                    <Text style={{ fontSize: 24, fontWeight: 700, color: '#F8FAFC' }}>管得住风险</Text>
+                    <Text style={{ fontSize: 24, fontWeight: 700, color: '#F8FAFC' }}>管得住</Text>
                     <Text style={{ fontSize: 18, color: 'rgba(248,250,252,0.62)', lineHeight: 1.7, marginTop: 9 }}>
-                        护栏是<span style={{ color: '#FB7185' }}>独立的一个图节点</span>，不是散落在各处的 if。<br />
-                        这条是三条里最贵的，也是这个项目能不能落地的分水岭。
+                        该问的问、该拦的拦：<span style={{ color: '#FB7185' }}>高危动作二次确认，跨家庭一律拦下</span>。<br />
+                        这一条，才是智能家居能不能落地的分水岭。
                     </Text>
                 </Box>
             </Box>
@@ -53,7 +54,7 @@
     </Box>
 
     <Box style={{ height: 64, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居多智能体中枢</Text>
-        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>03 / 13</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居 AI 管家</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>03 / 15</Text>
     </Box>
 </Slide>

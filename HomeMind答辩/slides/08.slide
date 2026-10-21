@@ -1,68 +1,49 @@
 <Slide style={{ width: 1280, height: 720, position: 'relative', overflow: 'hidden', background: '#0B1120', fontFamily: '微软雅黑' }}>
     <Box style={{ height: 110, paddingLeft: 64, paddingRight: 64, paddingTop: 34, flexDirection: 'row', alignItems: 'center', gap: 18 }}>
-        <Box style={{ width: 4, height: 34, background: '#FB7185' }} />
-        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>最贵的一页：护栏是独立节点</Text>
+        <Box style={{ width: 4, height: 34, background: '#38BDF8' }} />
+        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>能力二 · 记得住</Text>
+        <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.42)', marginTop: 8 }}>记忆的价值不是"存了"，是"能改行为"</Text>
     </Box>
 
     <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', gap: 48 }}>
-        <Box style={{ width: 340, justifyContent: 'space-between', background: 'rgba(251,113,133,0.06)', border: '1px solid rgba(251,113,133,0.22)', borderRadius: 10, padding: '30px 28px' }}>
-            <Box>
-                <Text style={{ fontSize: 100, fontWeight: 700, color: 'rgba(251,113,133,0.20)', fontFamily: 'Consolas', lineHeight: 1 }}>04</Text>
-                <Text style={{ fontSize: 30, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.5, marginTop: 14 }}>
-                    四条机制<br />挡在工具<br />前面
+        <Box style={{ width: 500, justifyContent: 'center' }}>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '26px 26px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', letterSpacing: 2, fontWeight: 700 }}>场景</Text>
+                <Box style={{ background: 'rgba(248,250,252,0.06)', borderRadius: 8, padding: '14px 18px', marginTop: 18 }}>
+                    <Text style={{ fontSize: 20, color: 'rgba(248,250,252,0.75)' }}>上周你说过：「我习惯空调 26 度」</Text>
+                </Box>
+                <Text style={{ fontSize: 20, color: 'rgba(248,250,252,0.50)', textAlign: 'center', marginTop: 14, marginBottom: 14 }}>↓</Text>
+                <Box style={{ background: 'rgba(56,189,248,0.10)', borderRadius: 8, padding: '14px 18px' }}>
+                    <Text style={{ fontSize: 21, color: '#F8FAFC' }}>这周你说「开空调」→ 直接 26 度</Text>
+                </Box>
+                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.55)', lineHeight: 1.7, marginTop: 18 }}>
+                    不用再说一遍温度。<br />
+                    记住 100 条，不如关键时用上 1 条。
                 </Text>
-                <Box style={{ width: 56, height: 3, background: '#FB7185', marginTop: 24 }} />
             </Box>
-            <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.55)', lineHeight: 1.85 }}>
-                它们全部写在同一个图节点里，<br />不是散落在各个 handler 的 if。
-            </Text>
         </Box>
 
-        <Box style={{ width: 716, flexDirection: 'column', gap: 14 }}>
-            <Box style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 20, background: 'rgba(251,113,133,0.08)', border: '1px solid rgba(251,113,133,0.42)', borderRadius: 10, paddingLeft: 24, paddingRight: 24 }}>
-                <Text style={{ fontSize: 14, color: '#FB7185', fontFamily: 'Consolas', fontWeight: 700, width: 30 }}>01</Text>
-                <Box style={{ width: 610 }}>
-                    <Text style={{ fontSize: 21, fontWeight: 700, color: '#F8FAFC' }}>高危工具强制二次确认</Text>
-                    <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.7, marginTop: 7 }}>
-                        门锁这类设备，没点过确认就不放行——接口层和 Agent 层用的是同一套规则
-                    </Text>
-                </Box>
+        <Box style={{ width: 620, flexDirection: 'column', gap: 16, justifyContent: 'center' }}>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(56,189,248,0.22)', borderRadius: 10, padding: '20px 24px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, letterSpacing: 1 }}>决策 1</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 8 }}>三层记忆，各管一段</Text>
+                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.58)', lineHeight: 1.7, marginTop: 8 }}>短期管这轮对话，长期管跨会话的习惯，语义管"意思相近就召回"。</Text>
             </Box>
-
-            <Box style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 20, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, paddingLeft: 24, paddingRight: 24 }}>
-                <Text style={{ fontSize: 14, color: 'rgba(251,113,133,0.70)', fontFamily: 'Consolas', fontWeight: 700, width: 30 }}>02</Text>
-                <Box style={{ width: 610 }}>
-                    <Text style={{ fontSize: 21, fontWeight: 700, color: '#F8FAFC' }}>创建类一律回显确认</Text>
-                    <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.7, marginTop: 7 }}>
-                        建提醒先把"即将创建：关灯（21:00）"念一遍，你点头才落地
-                    </Text>
-                </Box>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(56,189,248,0.22)', borderRadius: 10, padding: '20px 24px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, letterSpacing: 1 }}>决策 2</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 8 }}>召回结果反向改写工具参数</Text>
+                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.58)', lineHeight: 1.7, marginTop: 8 }}>记忆不只是"回想"，是"这次执行直接按它来"——这才是记忆对产品的意义。</Text>
             </Box>
-
-            <Box style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 20, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, paddingLeft: 24, paddingRight: 24 }}>
-                <Text style={{ fontSize: 14, color: 'rgba(251,113,133,0.70)', fontFamily: 'Consolas', fontWeight: 700, width: 30 }}>03</Text>
-                <Box style={{ width: 610 }}>
-                    <Text style={{ fontSize: 21, fontWeight: 700, color: '#F8FAFC' }}>说不清是哪台，就反问</Text>
-                    <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.7, marginTop: 7 }}>
-                        "打开灯"而家里有两盏，它回"客厅灯、主卧灯都对得上，你指哪一台"——不替你猜
-                    </Text>
-                </Box>
-            </Box>
-
-            <Box style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 20, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, paddingLeft: 24, paddingRight: 24 }}>
-                <Text style={{ fontSize: 14, color: 'rgba(251,113,133,0.70)', fontFamily: 'Consolas', fontWeight: 700, width: 30 }}>04</Text>
-                <Box style={{ width: 610 }}>
-                    <Text style={{ fontSize: 21, fontWeight: 700, color: '#F8FAFC' }}>跨家庭访问 403，且零副作用</Text>
-                    <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.7, marginTop: 7 }}>
-                        不是"先执行了再道歉"——在动设备之前就拦下，状态一点不动
-                    </Text>
-                </Box>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(56,189,248,0.22)', borderRadius: 10, padding: '20px 24px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, letterSpacing: 1 }}>决策 3</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 8 }}>改口就覆盖，不叠加矛盾</Text>
+                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.58)', lineHeight: 1.7, marginTop: 8 }}>你说"26 度"又改口"24 度"，旧值进历史留痕，新值生效——不会记成两条互相打架。</Text>
             </Box>
         </Box>
     </Box>
 
     <Box style={{ height: 64, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居多智能体中枢</Text>
-        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>08 / 13</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居 AI 管家</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>08 / 15</Text>
     </Box>
 </Slide>

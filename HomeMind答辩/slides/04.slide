@@ -1,66 +1,63 @@
 <Slide style={{ width: 1280, height: 720, position: 'relative', overflow: 'hidden', background: '#0B1120', fontFamily: '微软雅黑' }}>
     <Box style={{ height: 110, paddingLeft: 64, paddingRight: 64, paddingTop: 34, flexDirection: 'row', alignItems: 'center', gap: 18 }}>
         <Box style={{ width: 4, height: 34, background: '#38BDF8' }} />
-        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>六层架构，两张图</Text>
+        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>系统架构设计</Text>
     </Box>
 
-    <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'column', gap: 24 }}>
-        <Box style={{ height: 282, flexDirection: 'column', gap: 6 }}>
-            <Box style={{ height: 42, flexDirection: 'row', alignItems: 'center', background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 6, paddingLeft: 20, paddingRight: 20, gap: 20 }}>
-                <Text style={{ fontSize: 15, fontWeight: 700, color: '#F8FAFC', width: 96 }}>交互层</Text>
-                <Text style={{ fontSize: 14, color: 'rgba(248,250,252,0.62)' }}>原生 Web（零构建）· Gradio 演示 · FastAPI + Uvicorn</Text>
+    <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', gap: 48 }}>
+        <Box style={{ width: 560, flexDirection: 'column', gap: 10, justifyContent: 'center' }}>
+            <Box style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                <Text style={{ fontSize: 15, fontWeight: 700, color: '#38BDF8', width: 70 }}>编排</Text>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.66)' }}>LangGraph 两张图：单 Agent 主链路 + Supervisor 多 Agent</Text>
             </Box>
-
-            <Box style={{ height: 42, flexDirection: 'row', alignItems: 'center', background: 'rgba(56,189,248,0.10)', border: '1px solid rgba(56,189,248,0.45)', borderRadius: 6, paddingLeft: 20, paddingRight: 20, gap: 20 }}>
-                <Text style={{ fontSize: 15, fontWeight: 700, color: '#38BDF8', width: 96 }}>编排层</Text>
-                <Text style={{ fontSize: 14, color: 'rgba(248,250,252,0.80)' }}>LangGraph 两张图 —— 单 Agent 主图（6 节点）+ Supervisor 多 Agent 图</Text>
+            <Box style={{ height: 1, background: 'rgba(248,250,252,0.08)' }} />
+            <Box style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                <Text style={{ fontSize: 15, fontWeight: 700, color: '#38BDF8', width: 70 }}>模型</Text>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.66)' }}>DeepSeek + 规则引擎兜底（双模，任一可独立跑通）</Text>
             </Box>
-
-            <Box style={{ height: 42, flexDirection: 'row', alignItems: 'center', background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 6, paddingLeft: 20, paddingRight: 20, gap: 20 }}>
-                <Text style={{ fontSize: 15, fontWeight: 700, color: '#F8FAFC', width: 96 }}>模型层</Text>
-                <Text style={{ fontSize: 14, color: 'rgba(248,250,252,0.62)' }}>LLMClient（OpenAI 兼容协议）→ DeepSeek 实测打通 ｜ 规则引擎兜底</Text>
+            <Box style={{ height: 1, background: 'rgba(248,250,252,0.08)' }} />
+            <Box style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                <Text style={{ fontSize: 15, fontWeight: 700, color: '#38BDF8', width: 70 }}>工具</Text>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.66)' }}>自建 ToolRegistry：超时 / 重试 / 熔断 / 幂等</Text>
             </Box>
-
-            <Box style={{ height: 42, flexDirection: 'row', alignItems: 'center', background: 'rgba(56,189,248,0.10)', border: '1px solid rgba(56,189,248,0.45)', borderRadius: 6, paddingLeft: 20, paddingRight: 20, gap: 20 }}>
-                <Text style={{ fontSize: 15, fontWeight: 700, color: '#38BDF8', width: 96 }}>工具层</Text>
-                <Text style={{ fontSize: 14, color: 'rgba(248,250,252,0.80)' }}>自建 ToolRegistry —— 超时 / 重试 / 熔断 / 幂等，5 个工具，MCP 风格 Schema</Text>
+            <Box style={{ height: 1, background: 'rgba(248,250,252,0.08)' }} />
+            <Box style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                <Text style={{ fontSize: 15, fontWeight: 700, color: '#38BDF8', width: 70 }}>记忆</Text>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.66)' }}>短期 Redis + 长期 SQLite + 语义本地 embedding</Text>
             </Box>
-
-            <Box style={{ height: 42, flexDirection: 'row', alignItems: 'center', background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 6, paddingLeft: 20, paddingRight: 20, gap: 20 }}>
-                <Text style={{ fontSize: 15, fontWeight: 700, color: '#F8FAFC', width: 96 }}>记忆层</Text>
-                <Text style={{ fontSize: 14, color: 'rgba(248,250,252,0.62)' }}>短期 Redis 7.4（真跑）｜ 长期 SQLite ｜ 语义字符 bigram Jaccard</Text>
+            <Box style={{ height: 1, background: 'rgba(248,250,252,0.08)' }} />
+            <Box style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                <Text style={{ fontSize: 15, fontWeight: 700, color: '#38BDF8', width: 70 }}>隔离</Text>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.66)' }}>JWT + PBKDF2 · family_id 全链路穿透</Text>
             </Box>
-
-            <Box style={{ height: 42, flexDirection: 'row', alignItems: 'center', background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 6, paddingLeft: 20, paddingRight: 20, gap: 20 }}>
-                <Text style={{ fontSize: 15, fontWeight: 700, color: '#F8FAFC', width: 96 }}>数据层</Text>
-                <Text style={{ fontSize: 14, color: 'rgba(248,250,252,0.62)' }}>SQLite：family · custom_scene · device · room · device_seed_log</Text>
+            <Box style={{ height: 1, background: 'rgba(248,250,252,0.08)' }} />
+            <Box style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                <Text style={{ fontSize: 15, fontWeight: 700, color: '#38BDF8', width: 70 }}>前端</Text>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.66)' }}>零构建原生 Web（无 React/Vite），移动端优先</Text>
             </Box>
         </Box>
 
-        <Box style={{ height: 240, flexDirection: 'row', gap: 24 }}>
-            <Box style={{ width: 690, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '26px 28px' }}>
-                <Text style={{ fontSize: 22, fontWeight: 700, color: '#F8FAFC' }}>真正让它不像玩具的，是工具层</Text>
-                <Text style={{ fontSize: 18, color: 'rgba(248,250,252,0.62)', lineHeight: 1.75, marginTop: 14 }}>
-                    超时、重试、熔断（30 秒半开）、幂等、降级，全部内建在注册中心里——<br />
-                    业务 handler 只管干活，不操心这些。<br />
-                    <span style={{ color: '#38BDF8' }}>好处是答辩时能指着代码讲：策略在哪一行、为什么是这个值。</span>
-                </Text>
+        <Box style={{ width: 560, flexDirection: 'column', gap: 16, justifyContent: 'center' }}>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(56,189,248,0.22)', borderRadius: 10, padding: '20px 24px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, letterSpacing: 1 }}>亮点 1</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 8 }}>治理逻辑只有一处</Text>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.7, marginTop: 8 }}>超时/重试/熔断/幂等统一在 execution，主链路与子 Agent 共用，禁止各写一套。</Text>
             </Box>
-
-            <Box style={{ width: 438, background: 'rgba(56,189,248,0.06)', border: '1px solid rgba(56,189,248,0.28)', borderRadius: 10, padding: '26px 28px' }}>
-                <Text style={{ fontSize: 13, color: '#38BDF8', letterSpacing: 2, fontWeight: 700 }}>一句话判断</Text>
-                <Text style={{ fontSize: 21, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.6, marginTop: 16 }}>
-                    六个层里，只有编排层和工具层是我真正花时间的地方。
-                </Text>
-                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.58)', lineHeight: 1.75, marginTop: 14 }}>
-                    其余四层要么是现成的，要么是降级实现。
-                </Text>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(56,189,248,0.22)', borderRadius: 10, padding: '20px 24px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, letterSpacing: 1 }}>亮点 2</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 8 }}>多 Agent 是职责隔离，不是多个模型</Text>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.7, marginTop: 8 }}>三个子 Agent 各有工具白名单，日程管家拿不到门锁——这是第二道安全防线。</Text>
+            </Box>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(56,189,248,0.22)', borderRadius: 10, padding: '20px 24px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, letterSpacing: 1 }}>亮点 3</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 8 }}>人机协同：把"不误操作"做成硬约束</Text>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.7, marginTop: 8 }}>有歧义反问、高危二次确认——不是提示词里的请求，是代码里的闸。</Text>
             </Box>
         </Box>
     </Box>
 
     <Box style={{ height: 64, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居多智能体中枢</Text>
-        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>04 / 13</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居 AI 管家</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>04 / 15</Text>
     </Box>
 </Slide>

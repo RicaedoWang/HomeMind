@@ -1,62 +1,74 @@
 <Slide style={{ width: 1280, height: 720, position: 'relative', overflow: 'hidden', background: '#0B1120', fontFamily: '微软雅黑' }}>
-    <Box style={{ height: 110, paddingLeft: 64, paddingRight: 64, paddingTop: 34, flexDirection: 'row', alignItems: 'center', gap: 18 }}>
+    <Box style={{ height: 100, paddingLeft: 64, paddingRight: 64, paddingTop: 30, flexDirection: 'row', alignItems: 'center', gap: 18 }}>
         <Box style={{ width: 4, height: 34, background: '#38BDF8' }} />
-        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>我家那套"智能"家居，其实只会听指令</Text>
+        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>为什么需要这个项目</Text>
     </Box>
 
-    <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', gap: 52 }}>
+    <Box style={{ height: 66, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', gap: 16 }}>
+        <Box style={{ flex: 1, background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.25)', borderRadius: 8, padding: '10px 20px', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Text style={{ fontSize: 24, fontWeight: 700, color: '#38BDF8', fontFamily: 'Consolas' }}>6,870 亿</Text>
+            <Text style={{ fontSize: 14, color: 'rgba(248,250,252,0.55)' }}>中国智能家居市场（2025，IDC 口径）</Text>
+        </Box>
+        <Box style={{ flex: 1, background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.25)', borderRadius: 8, padding: '10px 20px', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Text style={{ fontSize: 24, fontWeight: 700, color: '#38BDF8', fontFamily: 'Consolas' }}>89%</Text>
+            <Text style={{ fontSize: 14, color: 'rgba(248,250,252,0.55)' }}>语音交互激活率 · 日均 6.3 次指令</Text>
+        </Box>
+        <Box style={{ flex: 1, background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.25)', borderRadius: 8, padding: '10px 20px', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Text style={{ fontSize: 24, fontWeight: 700, color: '#38BDF8', fontFamily: 'Consolas' }}>6.8 台</Text>
+            <Text style={{ fontSize: 14, color: 'rgba(248,250,252,0.55)' }}>每户平均连接设备（2021 年仅 2.3 台）</Text>
+        </Box>
+    </Box>
+
+    <Box style={{ height: 490, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', gap: 52, paddingTop: 16 }}>
         <Box style={{ width: 660, flexDirection: 'column', gap: 12 }}>
-            <Box style={{ flexDirection: 'row', gap: 22, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '21px 24px' }}>
+            <Box style={{ flexDirection: 'row', gap: 22, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '19px 24px' }}>
                 <Text style={{ fontSize: 34, fontWeight: 700, color: '#38BDF8', fontFamily: 'Consolas', lineHeight: 1.1, width: 52 }}>01</Text>
                 <Box style={{ width: 522 }}>
-                    <Text style={{ fontSize: 23, fontWeight: 700, color: '#F8FAFC' }}>它不记习惯</Text>
-                    <Text style={{ fontSize: 19, color: 'rgba(248,250,252,0.62)', lineHeight: 1.65, marginTop: 10 }}>
-                        每天早上都要重新说一遍"空调调到 26 度"。<br />
-                        所谓的智能，退化成一台需要你背诵指令的遥控器。
+                    <Text style={{ fontSize: 22, fontWeight: 700, color: '#F8FAFC' }}>记不住你的习惯</Text>
+                    <Text style={{ fontSize: 18, color: 'rgba(248,250,252,0.62)', lineHeight: 1.6, marginTop: 8 }}>
+                        说了十遍"空调 26 度"，它每天还问你要开几度。
                     </Text>
                 </Box>
             </Box>
 
-            <Box style={{ flexDirection: 'row', gap: 22, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '21px 24px' }}>
+            <Box style={{ flexDirection: 'row', gap: 22, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '19px 24px' }}>
                 <Text style={{ fontSize: 34, fontWeight: 700, color: '#38BDF8', fontFamily: 'Consolas', lineHeight: 1.1, width: 52 }}>02</Text>
                 <Box style={{ width: 522 }}>
-                    <Text style={{ fontSize: 23, fontWeight: 700, color: '#F8FAFC' }}>它分不清"现在做"和"到时候再做"</Text>
-                    <Text style={{ fontSize: 19, color: 'rgba(248,250,252,0.62)', lineHeight: 1.65, marginTop: 10 }}>
-                        你说"提醒我九点关灯"，它当场就把灯关了。<br />
-                        设备自己动了，比什么都不做更难向家里人解释。
+                    <Text style={{ fontSize: 22, fontWeight: 700, color: '#F8FAFC' }}>听不懂话外之意</Text>
+                    <Text style={{ fontSize: 18, color: 'rgba(248,250,252,0.62)', lineHeight: 1.6, marginTop: 8 }}>
+                        你说"提醒我九点关灯"，它当场就把灯关了。
                     </Text>
                 </Box>
             </Box>
 
-            <Box style={{ flexDirection: 'row', gap: 22, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '21px 24px' }}>
+            <Box style={{ flexDirection: 'row', gap: 22, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '19px 24px' }}>
                 <Text style={{ fontSize: 34, fontWeight: 700, color: '#38BDF8', fontFamily: 'Consolas', lineHeight: 1.1, width: 52 }}>03</Text>
                 <Box style={{ width: 522 }}>
-                    <Text style={{ fontSize: 23, fontWeight: 700, color: '#F8FAFC' }}>它没有边界</Text>
-                    <Text style={{ fontSize: 19, color: 'rgba(248,250,252,0.62)', lineHeight: 1.65, marginTop: 10 }}>
-                        一个账号能操作所有人家的设备，也就谈不上"一家人一个家"。<br />
-                        多用户这件事，得在架构里先留位置。
+                    <Text style={{ fontSize: 22, fontWeight: 700, color: '#F8FAFC' }}>没有边界感</Text>
+                    <Text style={{ fontSize: 18, color: 'rgba(248,250,252,0.62)', lineHeight: 1.6, marginTop: 8 }}>
+                        一个账号能控制所有人家的设备，设备说动就动。
                     </Text>
                 </Box>
             </Box>
         </Box>
 
         <Box style={{ width: 440, justifyContent: 'center' }}>
-            <Box style={{ background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.30)', borderRadius: 10, padding: '32px 30px' }}>
+            <Box style={{ background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.30)', borderRadius: 10, padding: '30px 30px' }}>
                 <Text style={{ fontSize: 13, color: '#38BDF8', letterSpacing: 3, fontWeight: 700 }}>所以问题的根源是</Text>
-                <Text style={{ fontSize: 26, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.5, marginTop: 18 }}>
-                    不是模型不够聪明，<br />是缺了执行前后的两层约束。
+                <Text style={{ fontSize: 26, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.5, marginTop: 16 }}>
+                    设备越来越多，<br />却缺了「理解」和「约束」两层。
                 </Text>
-                <Box style={{ width: 60, height: 1, background: 'rgba(248,250,252,0.20)', marginTop: 24 }} />
-                <Text style={{ fontSize: 18, color: 'rgba(248,250,252,0.62)', lineHeight: 1.75, marginTop: 20 }}>
-                    执行前：听懂并记住；<br />执行后：兜住错误。<br />
-                    这三条痛点，就是我要做的三件事。
+                <Box style={{ width: 60, height: 1, background: 'rgba(248,250,252,0.20)', marginTop: 22 }} />
+                <Text style={{ fontSize: 18, color: 'rgba(248,250,252,0.62)', lineHeight: 1.75, marginTop: 18 }}>
+                    理解：听懂并记住；<br />约束：兜住别乱动。<br />
+                    这三个痛点，就是我要解决的三件事。
                 </Text>
             </Box>
         </Box>
     </Box>
 
     <Box style={{ height: 64, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居多智能体中枢</Text>
-        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>02 / 13</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居 AI 管家</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>02 / 15</Text>
     </Box>
 </Slide>

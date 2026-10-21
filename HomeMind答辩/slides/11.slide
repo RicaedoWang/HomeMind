@@ -1,64 +1,71 @@
 <Slide style={{ width: 1280, height: 720, position: 'relative', overflow: 'hidden', background: '#0B1120', fontFamily: '微软雅黑' }}>
     <Box style={{ height: 110, paddingLeft: 64, paddingRight: 64, paddingTop: 34, flexDirection: 'row', alignItems: 'center', gap: 18 }}>
-        <Box style={{ width: 4, height: 34, background: '#FB7185' }} />
-        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>三个坑，每个都值几百行代码</Text>
+        <Box style={{ width: 4, height: 34, background: '#38BDF8' }} />
+        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>核心功能模块：意图识别</Text>
     </Box>
 
-    <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', gap: 34 }}>
-        <Box style={{ width: 716, flexDirection: 'column', gap: 14 }}>
-            <Box style={{ flex: 1, flexDirection: 'row', gap: 20, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '20px 24px' }}>
-                <Text style={{ fontSize: 40, fontWeight: 700, color: 'rgba(251,113,133,0.55)', fontFamily: 'Consolas', lineHeight: 1, width: 44 }}>01</Text>
-                <Box style={{ width: 604 }}>
-                    <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC' }}>模型不知道今天是几号</Text>
-                    <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.65, marginTop: 8 }}>
-                        prompt 里写着"示例：2026-10-14T09:00:00"，模型把它当成了现在。<br />
-                        用户建"今日任务"，条目一落地就显示<span style={{ color: '#FB7185' }}>逾期 5 天</span>。
-                    </Text>
+    <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', gap: 48 }}>
+        <Box style={{ width: 520, flexDirection: 'column', gap: 18, justifyContent: 'center' }}>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '22px 24px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', letterSpacing: 2, fontWeight: 700 }}>功能描述</Text>
+                <Text style={{ fontSize: 18, color: 'rgba(248,250,252,0.70)', lineHeight: 1.75, marginTop: 10 }}>
+                    <span style={{ color: '#F8FAFC', fontWeight: 700 }}>规则引擎 + 大模型双通道</span>：规则快且可控，大模型兜复杂句式。
+                    关键纪律：规则词表与 LLM prompt 两边同步，否则"规则好用、模型翻车"。
+                </Text>
+            </Box>
+
+            <Box style={{ background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '22px 24px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', letterSpacing: 2, fontWeight: 700 }}>识别 7 种意图</Text>
+                <Box style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
+                    <Text style={{ fontSize: 14, color: '#38BDF8', background: 'rgba(56,189,248,0.10)', borderRadius: 5, padding: '6px 12px' }}>device_control</Text>
+                    <Text style={{ fontSize: 14, color: '#38BDF8', background: 'rgba(56,189,248,0.10)', borderRadius: 5, padding: '6px 12px' }}>schedule</Text>
+                    <Text style={{ fontSize: 14, color: '#38BDF8', background: 'rgba(56,189,248,0.10)', borderRadius: 5, padding: '6px 12px' }}>schedule_query</Text>
+                    <Text style={{ fontSize: 14, color: '#38BDF8', background: 'rgba(56,189,248,0.10)', borderRadius: 5, padding: '6px 12px' }}>knowledge</Text>
+                    <Text style={{ fontSize: 14, color: '#38BDF8', background: 'rgba(56,189,248,0.10)', borderRadius: 5, padding: '6px 12px' }}>memory_query</Text>
+                    <Text style={{ fontSize: 14, color: '#38BDF8', background: 'rgba(56,189,248,0.10)', borderRadius: 5, padding: '6px 12px' }}>memory_write</Text>
+                    <Text style={{ fontSize: 14, color: '#38BDF8', background: 'rgba(56,189,248,0.10)', borderRadius: 5, padding: '6px 12px' }}>chat</Text>
                 </Box>
             </Box>
 
-            <Box style={{ flex: 1, flexDirection: 'row', gap: 20, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '20px 24px' }}>
-                <Text style={{ fontSize: 40, fontWeight: 700, color: 'rgba(251,113,133,0.55)', fontFamily: 'Consolas', lineHeight: 1, width: 44 }}>02</Text>
-                <Box style={{ width: 604 }}>
-                    <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC' }}>ok 配失败：报了成功，其实没动</Text>
-                    <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.65, marginTop: 8 }}>
-                        工具返回 <span style={{ fontFamily: 'Consolas' }}>success:false</span>，注册中心却仍是 <span style={{ fontFamily: 'Consolas' }}>ok:true</span>。<br />
-                        顺藤还揪出更狠的：自建门锁联动会<span style={{ color: '#FB7185' }}>反向把门锁上</span>，零报错。
-                    </Text>
-                </Box>
-            </Box>
-
-            <Box style={{ flex: 1, flexDirection: 'row', gap: 20, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '20px 24px' }}>
-                <Text style={{ fontSize: 40, fontWeight: 700, color: 'rgba(251,113,133,0.55)', fontFamily: 'Consolas', lineHeight: 1, width: 44 }}>03</Text>
-                <Box style={{ width: 604 }}>
-                    <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC' }}>我的测试把自己的数据删了</Text>
-                    <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.65, marginTop: 8 }}>
-                        评测每条用例都会重置设备库，而设备库没做隔离——<br />
-                        跑一次评测，<span style={{ color: '#FB7185' }}>你家里的 16 台设备全没了</span>。
-                    </Text>
-                </Box>
+            <Box style={{ background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.30)', borderRadius: 10, padding: '20px 24px' }}>
+                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.75)', lineHeight: 1.7 }}>
+                    验证方式：<span style={{ color: '#38BDF8', fontWeight: 700 }}>54 条端到端评测全通过 + 296 单测</span>。
+                    不标"意图准确率 %"——单点百分比会掩盖边界情况。
+                </Text>
             </Box>
         </Box>
 
-        <Box style={{ width: 402, flexDirection: 'column', justifyContent: 'space-between' }}>
-            <Box style={{ background: 'rgba(251,113,133,0.08)', border: '1px solid rgba(251,113,133,0.40)', borderRadius: 10, padding: '26px 26px' }}>
-                <Text style={{ fontSize: 13, color: '#FB7185', letterSpacing: 2, fontWeight: 700 }}>共同点</Text>
-                <Text style={{ fontSize: 22, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.6, marginTop: 14 }}>
-                    都不是"功能没做"，<br />是"做了但错了，<br />而且测试没抓到"。
-                </Text>
+        <Box style={{ width: 600, flexDirection: 'column', gap: 10, justifyContent: 'center' }}>
+            <Text style={{ fontSize: 13, color: '#38BDF8', letterSpacing: 2, fontWeight: 700 }}>真实测过的用例</Text>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 8, padding: '12px 18px', flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.85)', flex: 1 }}>"打开客厅灯"</Text>
+                <Text style={{ fontSize: 15, color: '#38BDF8', fontFamily: 'Consolas' }}>→ device_control</Text>
             </Box>
-
-            <Box style={{ background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '26px 26px' }}>
-                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.70)', lineHeight: 1.85 }}>
-                    所以后来立了条规矩：<br />
-                    <span style={{ color: '#38BDF8' }}>修完一个 bug，必须补一条能复现它的用例，并做反向验证</span>——把修复改回去，确认那条用例真的会红。
-                </Text>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 8, padding: '12px 18px', flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.85)', flex: 1 }}>"提醒我九点关灯"</Text>
+                <Text style={{ fontSize: 15, color: '#38BDF8', fontFamily: 'Consolas' }}>→ schedule（不误判为关灯）</Text>
+            </Box>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 8, padding: '12px 18px', flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.85)', flex: 1 }}>"看看今天的提醒"</Text>
+                <Text style={{ fontSize: 15, color: '#38BDF8', fontFamily: 'Consolas' }}>→ schedule_query（只读）</Text>
+            </Box>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 8, padding: '12px 18px', flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.85)', flex: 1 }}>"空调滤网怎么洗"</Text>
+                <Text style={{ fontSize: 15, color: '#38BDF8', fontFamily: 'Consolas' }}>→ knowledge</Text>
+            </Box>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 8, padding: '12px 18px', flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.85)', flex: 1 }}>"打开灯"（家里两盏）</Text>
+                <Text style={{ fontSize: 15, color: '#38BDF8', fontFamily: 'Consolas' }}>→ 反问澄清，不闷头开</Text>
+            </Box>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 8, padding: '12px 18px', flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.85)', flex: 1 }}>"今天天气怎么样"</Text>
+                <Text style={{ fontSize: 15, color: '#38BDF8', fontFamily: 'Consolas' }}>→ chat（闲聊兜底）</Text>
             </Box>
         </Box>
     </Box>
 
     <Box style={{ height: 64, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居多智能体中枢</Text>
-        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>11 / 13</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居 AI 管家</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>11 / 15</Text>
     </Box>
 </Slide>

@@ -2,29 +2,29 @@
     <Image src="assets/home_atmosphere.png" style={{ position: 'absolute', top: 0, left: 0, width: 1280, height: 720, objectFit: 'cover' }} />
     <Box style={{ position: 'absolute', top: 0, left: 0, width: 1280, height: 720, background: 'linear-gradient(90deg, rgba(11,17,32,0.95) 0%, rgba(11,17,32,0.86) 40%, rgba(11,17,32,0.30) 100%)' }} />
 
-    <Box style={{ position: 'relative', zIndex: 1, paddingLeft: 96, paddingTop: 156, width: 780 }}>
+    <Box style={{ position: 'relative', zIndex: 1, paddingLeft: 96, paddingTop: 150, width: 780 }}>
         <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 30 }}>
             <Box style={{ width: 48, height: 3, background: '#38BDF8' }} />
-            <Text style={{ fontSize: 14, color: '#38BDF8', letterSpacing: 4, fontWeight: 700 }}>智能家居 AGENT 中枢</Text>
+            <Text style={{ fontSize: 14, color: '#38BDF8', letterSpacing: 4, fontWeight: 700 }}>智能家居 AI 管家</Text>
         </Box>
 
         <Text style={{ fontSize: 68, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.1, letterSpacing: 1 }}>HomeMind</Text>
-        <Text style={{ fontSize: 31, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.35, marginTop: 10, letterSpacing: 1 }}>智能家居多智能体中枢</Text>
+        <Text style={{ fontSize: 34, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.35, marginTop: 14, letterSpacing: 1 }}>让智能家居真正「听得懂人话」</Text>
 
         <Box style={{ width: 460, height: 1, background: 'rgba(248,250,252,0.16)', marginTop: 34 }} />
 
-        <Text style={{ fontSize: 20, color: 'rgba(248,250,252,0.72)', lineHeight: 1.8, marginTop: 26, width: 520 }}>
-            听得懂人话 · 记得住习惯 · 管得住风险
+        <Text style={{ fontSize: 20, color: 'rgba(248,250,252,0.72)', lineHeight: 1.8, marginTop: 26, width: 540 }}>
+            听得懂 · 记得住 · 管得住
         </Text>
 
-        <Box style={{ flexDirection: 'row', gap: 56, marginTop: 68 }}>
+        <Box style={{ flexDirection: 'row', gap: 56, marginTop: 72 }}>
             <Box>
-                <Text style={{ fontSize: 12, color: 'rgba(248,250,252,0.42)', letterSpacing: 2 }}>答辩人</Text>
+                <Text style={{ fontSize: 12, color: 'rgba(248,250,252,0.42)', letterSpacing: 2 }}>汇报人</Text>
                 <Text style={{ fontSize: 19, color: '#F8FAFC', marginTop: 8 }}>[ 你的名字 ]</Text>
             </Box>
             <Box>
                 <Text style={{ fontSize: 12, color: 'rgba(248,250,252,0.42)', letterSpacing: 2 }}>项目规模</Text>
-                <Text style={{ fontSize: 19, color: '#F8FAFC', marginTop: 8, fontFamily: 'Consolas' }}>15,093 行 / 71 提交</Text>
+                <Text style={{ fontSize: 19, color: '#F8FAFC', marginTop: 8, fontFamily: 'Consolas' }}>16,531 行 / 76 提交</Text>
             </Box>
             <Box>
                 <Text style={{ fontSize: 12, color: 'rgba(248,250,252,0.42)', letterSpacing: 2 }}>日期</Text>

@@ -335,6 +335,8 @@ homemind/
 │   │   ├── short_term.py      滑动窗口 + 超限摘要压缩（Redis / 降级内存）
 │   │   ├── long_term.py       SQLite 长期记忆（表结构对齐 MySQL，唯一键含 family_id）
 │   │   ├── semantic.py        语义召回（真向量 + 余弦；模型不可用时降级 bigram Jaccard）
+│   │   ├── embedder.py        ★ 本地 embedding（fastembed + bge-small-zh 512 维，懒加载 + 失败封口）
+│   │   ├── knowledge_store.py ★ 知识库说明书落库 + 语义检索（向量 BLOB + 阈值过滤噪声）
 │   │   └── service.py         统一门面：写入 / 召回排序 / 冲突更新 / 遗忘
 │   ├── eval/                  端到端评测：54 条用例 + 红线一票否决 + 报告
 │   └── api/

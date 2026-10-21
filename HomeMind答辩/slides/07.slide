@@ -1,68 +1,49 @@
 <Slide style={{ width: 1280, height: 720, position: 'relative', overflow: 'hidden', background: '#0B1120', fontFamily: '微软雅黑' }}>
     <Box style={{ height: 110, paddingLeft: 64, paddingRight: 64, paddingTop: 34, flexDirection: 'row', alignItems: 'center', gap: 18 }}>
         <Box style={{ width: 4, height: 34, background: '#38BDF8' }} />
-        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>它会记得你说过 26 度</Text>
+        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>能力一 · 听得懂</Text>
+        <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.42)', marginTop: 8 }}>有歧义就反问，绝不替你猜</Text>
     </Box>
 
-    <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'column', gap: 24 }}>
-        <Box style={{ height: 300, flexDirection: 'column', gap: 12 }}>
-            <Box style={{ height: 84, flexDirection: 'row', alignItems: 'center', gap: 22, background: 'rgba(56,189,248,0.10)', border: '1px solid rgba(56,189,248,0.45)', borderRadius: 8, paddingLeft: 26, paddingRight: 26 }}>
-                <Text style={{ fontSize: 18, fontWeight: 700, color: '#38BDF8', width: 110 }}>短期记忆</Text>
-                <Box style={{ width: 900 }}>
-                    <Text style={{ fontSize: 19, fontWeight: 700, color: '#F8FAFC' }}>Redis 滑动窗口 · 带 TTL</Text>
-                    <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', marginTop: 6 }}>当前这轮对话的上下文。Docker 真跑，停容器会自动降级内存</Text>
+    <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', gap: 48 }}>
+        <Box style={{ width: 500, justifyContent: 'center' }}>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '26px 26px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', letterSpacing: 2, fontWeight: 700 }}>场景</Text>
+                <Box style={{ background: 'rgba(56,189,248,0.10)', borderRadius: 8, padding: '14px 18px', marginTop: 18 }}>
+                    <Text style={{ fontSize: 21, color: '#F8FAFC' }}>你说：「打开灯」</Text>
                 </Box>
-            </Box>
-
-            <Box style={{ height: 84, flexDirection: 'row', alignItems: 'center', gap: 22, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 8, paddingLeft: 26, paddingRight: 26, marginLeft: 60 }}>
-                <Text style={{ fontSize: 18, fontWeight: 700, color: '#F8FAFC', width: 110 }}>长期记忆</Text>
-                <Box style={{ width: 800 }}>
-                    <Text style={{ fontSize: 19, fontWeight: 700, color: '#F8FAFC' }}>SQLite · 版本留痕</Text>
-                    <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', marginTop: 6 }}>跨会话的习惯。改口不覆盖旧记录，version +1 并进 history</Text>
+                <Text style={{ fontSize: 20, color: 'rgba(248,250,252,0.50)', textAlign: 'center', marginTop: 14, marginBottom: 14 }}>↓</Text>
+                <Box style={{ background: 'rgba(248,250,252,0.06)', borderRadius: 8, padding: '14px 18px' }}>
+                    <Text style={{ fontSize: 21, color: '#F8FAFC' }}>它反问：「客厅还是卧室？」</Text>
                 </Box>
-            </Box>
-
-            <Box style={{ height: 84, flexDirection: 'row', alignItems: 'center', gap: 22, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 8, paddingLeft: 26, paddingRight: 26, marginLeft: 120 }}>
-                <Text style={{ fontSize: 18, fontWeight: 700, color: '#F8FAFC', width: 110 }}>语义记忆</Text>
-                <Box style={{ width: 700 }}>
-                    <Text style={{ fontSize: 19, fontWeight: 700, color: '#F8FAFC' }}>字符 bigram Jaccard</Text>
-                    <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', marginTop: 6 }}>写入时查重，相似度 ≥ 0.85 判为同一条。Milvus 真向量未接</Text>
-                </Box>
+                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.55)', lineHeight: 1.7, marginTop: 18 }}>
+                    家里有两盏灯，它不闷头开客厅那盏。<br />
+                    宁可显得笨，也不替你按下开关。
+                </Text>
             </Box>
         </Box>
 
-        <Box style={{ height: 222, flexDirection: 'row', gap: 24 }}>
-            <Box style={{ width: 690, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '24px 28px' }}>
-                <Text style={{ fontSize: 13, color: '#38BDF8', letterSpacing: 2, fontWeight: 700 }}>召回不是简单 Top-K</Text>
-                <Box style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, marginTop: 14 }}>
-                    <Text style={{ fontSize: 40, fontWeight: 700, color: '#38BDF8', fontFamily: 'Consolas' }}>0.6</Text>
-                    <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.62)' }}>语义相似</Text>
-                    <Text style={{ fontSize: 22, color: 'rgba(248,250,252,0.35)', marginLeft: 6 }}>+</Text>
-                    <Text style={{ fontSize: 40, fontWeight: 700, color: '#F8FAFC', fontFamily: 'Consolas', marginLeft: 6 }}>0.2</Text>
-                    <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.62)' }}>时效</Text>
-                    <Text style={{ fontSize: 22, color: 'rgba(248,250,252,0.35)', marginLeft: 6 }}>+</Text>
-                    <Text style={{ fontSize: 40, fontWeight: 700, color: '#F8FAFC', fontFamily: 'Consolas', marginLeft: 6 }}>0.2</Text>
-                    <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.62)' }}>重要度</Text>
-                </Box>
-                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.58)', lineHeight: 1.75, marginTop: 14 }}>
-                    权重可解释、可调——答辩时能当场改配置看结果变化。
-                </Text>
+        <Box style={{ width: 620, flexDirection: 'column', gap: 16, justifyContent: 'center' }}>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(56,189,248,0.22)', borderRadius: 10, padding: '20px 24px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, letterSpacing: 1 }}>决策 1</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 8 }}>有歧义就反问，而不是猜一个</Text>
+                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.58)', lineHeight: 1.7, marginTop: 8 }}>猜错的代价是误操作——设备动了，比没反应更难收场。</Text>
             </Box>
-
-            <Box style={{ width: 438, background: 'rgba(56,189,248,0.06)', border: '1px solid rgba(56,189,248,0.28)', borderRadius: 10, padding: '24px 28px' }}>
-                <Text style={{ fontSize: 13, color: '#38BDF8', letterSpacing: 2, fontWeight: 700 }}>记忆最有价值的标志</Text>
-                <Text style={{ fontSize: 21, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.6, marginTop: 12 }}>
-                    它能反向改变行为
-                </Text>
-                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.60)', lineHeight: 1.75, marginTop: 10 }}>
-                    说"把空调打开"，它会按你记下的偏好设成 26 度——而不是等你再说一遍。
-                </Text>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(56,189,248,0.22)', borderRadius: 10, padding: '20px 24px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, letterSpacing: 1 }}>决策 2</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 8 }}>规则 + 模型双通道</Text>
+                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.58)', lineHeight: 1.7, marginTop: 8 }}>规则快且可控，模型兜复杂句。模型挂了不是"抱歉我不懂"，是照常能开关灯。</Text>
+            </Box>
+            <Box style={{ background: '#16223A', border: '1px solid rgba(56,189,248,0.22)', borderRadius: 10, padding: '20px 24px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700, letterSpacing: 1 }}>决策 3</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 8 }}>解析前注入"现在几点"</Text>
+                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.58)', lineHeight: 1.7, marginTop: 8 }}>模型没有系统时钟，不告诉它"现在"，"今天九点"会被排到错误的日子。</Text>
             </Box>
         </Box>
     </Box>
 
     <Box style={{ height: 64, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居多智能体中枢</Text>
-        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>07 / 13</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居 AI 管家</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>07 / 15</Text>
     </Box>
 </Slide>

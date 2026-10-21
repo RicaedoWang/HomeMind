@@ -1,57 +1,42 @@
 <Slide style={{ width: 1280, height: 720, position: 'relative', overflow: 'hidden', background: '#0B1120', fontFamily: '微软雅黑' }}>
     <Box style={{ height: 110, paddingLeft: 64, paddingRight: 64, paddingTop: 34, flexDirection: 'row', alignItems: 'center', gap: 18 }}>
         <Box style={{ width: 4, height: 34, background: '#38BDF8' }} />
-        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>它现在还不能做什么</Text>
+        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>怎么证明它真的有用</Text>
     </Box>
 
-    <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', gap: 48 }}>
-        <Box style={{ width: 320, justifyContent: 'center', background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '32px 28px' }}>
-            <Text style={{ fontSize: 30, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.5 }}>
-                主动说清楚<br />哪里没做好
-            </Text>
-            <Box style={{ width: 56, height: 3, background: '#38BDF8', marginTop: 24 }} />
-            <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.58)', lineHeight: 1.85, marginTop: 22 }}>
-                被问出来才承认，<br />比主动标注难看一百倍。<br />下面这些我都能说清"为什么还没做"。
-            </Text>
+    <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'column', gap: 28, justifyContent: 'center' }}>
+        <Box style={{ flexDirection: 'row', gap: 24 }}>
+            <Box style={{ flex: 1, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '26px 22px' }}>
+                <Text style={{ fontSize: 52, fontWeight: 700, color: '#38BDF8', fontFamily: 'Consolas', lineHeight: 1 }}>296</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 12 }}>单元测试</Text>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.55)', lineHeight: 1.6, marginTop: 8 }}>快、确定性，不花钱不联网。修一个 bug 补一条能复现它的用例。</Text>
+            </Box>
+            <Box style={{ flex: 1, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '26px 22px' }}>
+                <Text style={{ fontSize: 52, fontWeight: 700, color: '#38BDF8', fontFamily: 'Consolas', lineHeight: 1 }}>54</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 12 }}>端到端评测</Text>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.55)', lineHeight: 1.6, marginTop: 8 }}>安全红线一票否决，跑之前先复位状态。抓"改坏了"。</Text>
+            </Box>
+            <Box style={{ flex: 1, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '26px 22px' }}>
+                <Text style={{ fontSize: 52, fontWeight: 700, color: '#38BDF8', fontFamily: 'Consolas', lineHeight: 1 }}>43</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 12 }}>端到端验收</Text>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.55)', lineHeight: 1.6, marginTop: 8 }}>真起服务 + 真 JWT，串完整链路。抓"单测旁路掉的东西"。</Text>
+            </Box>
+            <Box style={{ flex: 1, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '26px 22px' }}>
+                <Text style={{ fontSize: 52, fontWeight: 700, color: '#38BDF8', fontFamily: 'Consolas', lineHeight: 1 }}>32</Text>
+                <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC', marginTop: 12 }}>前端冒烟</Text>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.55)', lineHeight: 1.6, marginTop: 8 }}>逐个点交互，点了必须有请求。抓"看着能点、其实没反应"。</Text>
+            </Box>
         </Box>
 
-        <Box style={{ width: 720, flexDirection: 'column', gap: 16 }}>
-            <Box style={{ flex: 1, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '20px 26px' }}>
-                <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <Text style={{ fontSize: 18, fontWeight: 700, color: '#F8FAFC' }}>跑的是降级实现</Text>
-                    <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.42)' }}>代码就绪，换配置即可</Text>
-                </Box>
-                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.8, marginTop: 10 }}>
-                    Redis 已真跑单实例，但主从/备份没做 ｜ Milvus 没接，用的是字符 bigram Jaccard<br />
-                    MySQL 只有建表 DDL ｜ Docker Compose 文件在，没实际起过
-                </Text>
-            </Box>
-
-            <Box style={{ flex: 1, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '20px 26px' }}>
-                <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <Text style={{ fontSize: 18, fontWeight: 700, color: '#F8FAFC' }}>根本没做的</Text>
-                    <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.42)' }}>规划里有，时间不够</Text>
-                </Box>
-                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.8, marginTop: 10 }}>
-                    多轮指代消解——说"把它关了"，它不知道"它"是哪台 ｜ 主动服务 ｜ 从行为日志学习惯<br />
-                    设备别名只做到房间级："卧室灯"认得出，"卧室那盏"认不出
-                </Text>
-            </Box>
-
-            <Box style={{ flex: 1, background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.35)', borderRadius: 10, padding: '20px 26px' }}>
-                <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <Text style={{ fontSize: 18, fontWeight: 700, color: '#38BDF8' }}>下一步先做这两个</Text>
-                </Box>
-                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.66)', lineHeight: 1.8, marginTop: 10 }}>
-                    ① 把评测红线挂到 GitHub Actions——让"能拦住回归"变成仓库里有据可查的事实<br />
-                    ② 接本地 embedding，让语义召回认得出"空调太冷"和"温度调高点"是同一个人说的
-                </Text>
-            </Box>
+        <Box style={{ background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.30)', borderRadius: 10, padding: '20px 28px' }}>
+            <Text style={{ fontSize: 21, color: '#F8FAFC', lineHeight: 1.6 }}>
+                这四层<span style={{ color: '#38BDF8', fontWeight: 700 }}>不是重复劳动</span>，是各自堵不同的洞：单测旁路认证所以测不到 JWT，端到端只覆盖主路径，前端冒烟抓"点了没反应"。
+            </Text>
         </Box>
     </Box>
 
     <Box style={{ height: 64, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居多智能体中枢</Text>
-        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>12 / 13</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居 AI 管家</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>12 / 15</Text>
     </Box>
 </Slide>
