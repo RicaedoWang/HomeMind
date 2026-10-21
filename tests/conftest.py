@@ -52,12 +52,15 @@ def _isolated_content_store(tmp_path):
         FamilyStore, SceneStore, set_family_store, set_scene_store,
     )
     from homemind.tools.device_store import DeviceStore, set_device_store
+    from homemind.memory.knowledge_store import KnowledgeStore, set_knowledge_store
 
     db = str(tmp_path / "content.db")
     set_family_store(FamilyStore(db))
     set_scene_store(SceneStore(db))
     set_device_store(DeviceStore(db))
+    set_knowledge_store(KnowledgeStore(db))
     yield
     set_family_store(None)
     set_scene_store(None)
     set_device_store(None)
+    set_knowledge_store(None)

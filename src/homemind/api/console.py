@@ -46,6 +46,7 @@ from ..auth.family_store import VALID_ACTIONS, get_family, get_scene_store
 from .auth import get_account_store
 from ..core.trace import get_logger, new_trace_id, set_trace_id
 from ..memory.service import get_memory_service
+from ..memory.knowledge_store import get_knowledge_store
 from ..memory.short_term import get_short_term_memory
 from ..tools.calendar_server import delete_schedule, get_schedules, reset_schedules
 from ..core.tenancy import DEFAULT_FAMILY_ID, FAMILY_ARG
@@ -1379,6 +1380,61 @@ async def forget_habit(
         actor=user.name,
     )
     return {"ok": True, "forgot": req.memory_key}
+
+
+class KnowledgeImportRequest(BaseModel):
+    """导入说明书 / 使用常识的请求。"""
+
+    text: str = Field(..., description="要导入的文本，按空行切成多块")
+    title: str = Field("", description="可选：这批片段的标题前缀")
+
+
+@router.get("/knowledge")
+def list_knowledge(user: AuthUser = Depends(current_user)) -> dict[str, Any]:
+    """本家庭已导入的知识条目（设备说明书 / 使用常识）。"""
+    store = get_knowledge_store()
+    docs = store.list_docs(user.family_id)
+    return {"docs": docs, "count": len(docs)}
+
+
+@router.post("/knowledge")
+def import_knowledge(
+    req: KnowledgeImportRequest, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
+    """导入一段说明书：按空行切块、去重、向量化后落库。
+
+    返回 added / skipped，前端据此提示"导入了 N 段、去重 M 段"——
+    让用户知道哪些进去了、哪些是重复粘贴。
+    """
+    text = req.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="内容不能为空")
+    if len(text) > 20000:
+        raise HTTPException(status_code=400, detail="一次导入太长了，2 万字以内")
+    store = get_knowledge_store()
+    result = store.import_text(user.family_id, text, title=req.title)
+    if result["added"] == 0:
+        raise HTTPException(status_code=400, detail="没有可导入的内容（可能全是重复的）")
+    if result["skipped"]:
+        title = f"导入了 {result['added']} 段说明书（去重 {result['skipped']} 段）"
+    else:
+        title = f"导入了 {result['added']} 段说明书"
+    record_event(user.family_id, TYPE_SYSTEM, title=title,
+                 body=f"操作人：{user.name}", actor=user.name)
+    return {"ok": True, **result}
+
+
+@router.delete("/knowledge/{doc_id}")
+def delete_knowledge(
+    doc_id: int, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
+    """删一条知识条目。只删用户导入的，内置常识不可删（也不在库里）。"""
+    store = get_knowledge_store()
+    if not store.delete(user.family_id, doc_id):
+        raise HTTPException(status_code=404, detail="这条知识不存在或属于内置常识（不可删）")
+    record_event(user.family_id, TYPE_SYSTEM, title="删除了一条说明书",
+                 body=f"操作人：{user.name}", actor=user.name)
+    return {"ok": True, "removed": doc_id}
 
 
 def mount_web(app: Any) -> None:

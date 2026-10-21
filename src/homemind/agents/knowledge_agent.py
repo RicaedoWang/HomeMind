@@ -1,8 +1,13 @@
-"""知识问答 Agent：设备说明书 / 使用常识（F13 RAG 的最小可用版）。
+"""知识问答 Agent：设备说明书 / 使用常识（F13 RAG）。
 
-检索策略：内置文档片段 + 字符 bigram Jaccard 相似度。
-为什么不上真向量库：本地没 embedding 服务，硬上 Milvus 会引入一个必挂的外部依赖。
-先把检索链路跑通（召回 → 拼上下文 → 生成 → 降级），V0.8 后续换 embedding 只是替换一行。
+检索策略（V1.5）：
+- **用户导入的说明书**（`knowledge_doc` 表）走本地 embedding 真向量召回，
+  模型不可用时自动退化 Jaccard——详见 `memory/knowledge_store.py`。
+- **内置常识片段**（`DOCS`，5 个通用常识）用 Jaccard 字面匹配兜底。
+- 两条结果合并、按分数排序取 top_k。
+
+为什么内置常识不落库：它们是跟版本走的通用常识，用户不能删，
+按 V1.2「内置留代码、用户落库」约定留在代码里。
 
 诚实原则：检索不到就说检索不到，不让它瞎编说明书内容。
 """
@@ -12,10 +17,13 @@ from __future__ import annotations
 from typing import Any
 
 from ..core.llm import get_llm_client
+from ..core.tenancy import DEFAULT_FAMILY_ID, FAMILY_ARG
+from ..memory.knowledge_store import get_knowledge_store
 from ..memory.semantic import jaccard_similarity
 from .base import AgentOutcome, BaseAgent
 
-# 内置知识片段：（标题, 正文）。真实项目里这一层换成向量库 + 文档切片。
+# 内置知识片段：（标题, 正文）。跟版本走的通用常识，只读、不落库。
+# 用户导入的说明书走 knowledge_doc 表（见 memory/knowledge_store.py）。
 DOCS: list[tuple[str, str]] = [
     ("空调滤网清洗", "空调滤网建议每两周清洗一次：断电后打开前面板，取出滤网用清水冲洗，"
                 "晾干后再装回。长期不洗会导致制冷变慢、耗电上升。"),
@@ -30,11 +38,24 @@ DOCS: list[tuple[str, str]] = [
 ]
 
 
-def retrieve(query: str, top_k: int = 2) -> list[tuple[str, str, float]]:
-    """按 Jaccard 相似度检索最相关的文档片段。"""
-    scored = [(title, body, jaccard_similarity(query, title + body)) for title, body in DOCS]
-    scored.sort(key=lambda x: x[2], reverse=True)
-    return [s for s in scored[:top_k] if s[2] > 0.0]
+def retrieve(query: str, family_id: str, top_k: int = 2) -> list[tuple[str, str, float]]:
+    """合并「用户导入的说明书」与「内置常识」，按分数降序取 top_k。
+
+    - 用户库：`KnowledgeStore.search()`（真向量余弦，模型不可用退化 Jaccard）
+    - 内置：Jaccard 字面匹配（5 个通用常识片段，字面重合即可命中）
+
+    两边的分数都在 0–1 区间，直接合并排序。用户自己导入的说明书通常
+    embedding 余弦更高、自然排前面；没导入相关说明时内置常识兜底。
+    """
+    merged: list[tuple[str, str, float]] = []
+    for hit in get_knowledge_store().search(family_id, query, top_k=top_k):
+        merged.append((hit["title"], hit["content"], hit["score"]))
+    for title, body in DOCS:
+        score = jaccard_similarity(query, title + body)
+        if score > 0:
+            merged.append((title, body, score))
+    merged.sort(key=lambda x: x[2], reverse=True)
+    return merged[:top_k]
 
 
 class KnowledgeAgent(BaseAgent):
@@ -52,7 +73,8 @@ class KnowledgeAgent(BaseAgent):
         outcome: AgentOutcome,
     ) -> AgentOutcome:
         query = state.get("user_input", "")
-        hits = retrieve(query, top_k=2)
+        family_id = state.get(FAMILY_ARG, DEFAULT_FAMILY_ID)
+        hits = retrieve(query, family_id, top_k=2)
 
         if not hits:
             outcome.answer = ("这个我在说明书库里没查到。可以换个说法再问，"

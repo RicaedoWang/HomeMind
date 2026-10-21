@@ -1599,6 +1599,68 @@
     }
   }
 
+  async function renderKnowledgeInto(host) {
+    host.innerHTML = '<div style="font-size:13px;color:var(--hm-text-tertiary)">正在读取知识库…</div>';
+    try {
+      const res = await api('/api/console/knowledge');
+      if (!res.count) {
+        host.innerHTML = `<div style="font-size:13px;color:var(--hm-text-tertiary)">
+          还没有导入说明书。导入后问 AI「空调滤网怎么洗」这类问题，会按语义从这里召回答案。</div>`;
+        return;
+      }
+      host.innerHTML = res.docs.map((d) => `<div class="hm-kv is-clickable" data-kb="${d.id}"
+          role="button" tabindex="0" title="点击删除这条">
+          <span>${esc(d.title)}</span>
+          <b>${esc(d.content.slice(0, 20))}${d.content.length > 20 ? '…' : ''}</b></div>`).join('');
+      // 说明书能导也得能删，否则导错了永远改不回来
+      $$('[data-kb]', host).forEach((el) => {
+        const fire = () => askDeleteKnowledge(el.dataset.kb);
+        el.addEventListener('click', fire);
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fire(); }
+        });
+      });
+    } catch {
+      host.innerHTML = '<div style="font-size:13px;color:var(--hm-text-tertiary)">知识库读取失败</div>';
+    }
+  }
+
+  async function importKnowledge() {
+    const input = $('#kb-input');
+    const text = (input.value || '').trim();
+    if (!text) { showToast('先粘贴一段说明书内容'); return; }
+    const btn = $('#btn-kb-import');
+    btn.disabled = true;
+    try {
+      const res = await api('/api/console/knowledge', { text });
+      showToast(`已导入 ${res.added} 段说明书${res.skipped ? `，去重 ${res.skipped} 段` : ''}`);
+      input.value = '';
+      renderKnowledgeInto($('#page-me-knowledge'));
+    } catch (e) {
+      showToast(e.message || '导入失败，请重试');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function askDeleteKnowledge(id) {
+    openModal({
+      title: '删除这条说明书？',
+      desc: '删除后 AI 问答将不再从这条内容召回答案。',
+      tone: 'warning',
+      okText: '删除',
+      onOk: async () => {
+        try {
+          await api(`/api/console/knowledge/${id}`, null, 'DELETE');
+          showToast('已删除');
+          renderKnowledgeInto($('#page-me-knowledge'));
+        } catch {
+          showToast('删除失败，请重试');
+        }
+      },
+    });
+  }
+
   function renderPages() {
     if (!store.data) return;   // 没登录时不渲染，别拿 null 去取 tasks
     // 任务页：全部任务（含已完成 / 已取消），可恢复
@@ -1727,6 +1789,13 @@
       </div>
       <div id="page-me-habits"></div>
       <div class="hm-card">
+        <div class="hm-card__title">知识库 · 导入设备说明书，AI 问答按语义召回</div>
+        <textarea id="kb-input" rows="4" placeholder="粘贴设备说明书，空行分隔不同条目。例如：&#10;&#10;空调滤网建议每两周清洗一次……&#10;&#10;门锁电量低时更换 4 节 5 号电池……"
+          style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid rgba(148,163,184,0.3);background:transparent;color:var(--hm-text);font-size:14px;font-family:inherit;resize:vertical"></textarea>
+        <button class="hm-btn hm-btn--ghost" id="btn-kb-import" type="button" style="margin-top:10px">导入到知识库</button>
+        <div id="page-me-knowledge" style="margin-top:14px"></div>
+      </div>
+      <div class="hm-card">
         <div class="hm-card__title">关于这套系统</div>
         <div class="hm-kv"><span>意图识别</span><b>规则 + LLM 双通道</b></div>
         <div class="hm-kv"><span>编排</span><b>LangGraph 多智能体</b></div>
@@ -1775,6 +1844,9 @@
     }
 
     renderHabitsInto($('#page-me-habits'));
+    renderKnowledgeInto($('#page-me-knowledge'));
+    const kbImport = $('#btn-kb-import');
+    if (kbImport) kbImport.addEventListener('click', importKnowledge);
   }
 
   // ---------------------------------------------------------- 路由

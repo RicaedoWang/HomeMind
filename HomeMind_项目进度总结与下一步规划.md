@@ -14,13 +14,13 @@
 
 | 指标 | 实测值 | 备注 |
 |---|---|---|
-| Python 代码总量 | **15,876 行 / 81 个文件** | `src` + `scripts` + `tests`，`verify_all.py` 实时统计 |
-| 单元测试 | **277 passed / 约 30s** | 20 个测试文件，mock 模式确定性执行 |
+| Python 代码总量 | **16,531 行 / 84 个文件** | `src` + `scripts` + `tests`，`verify_all.py` 实时统计 |
+| 单元测试 | **296 passed / 约 30s** | 22 个测试文件，mock 模式确定性执行 |
 | 端到端评测 | **54 条，通过率 100%，红线 9/9** | `python scripts/run_eval.py`，含基线对比 |
 | 端到端验收 | **43 项全过** | `python scripts/verify_interactions.py`，真起服务 + 真实 JWT |
 | 前端无头冒烟 | **32 项** | `node scripts/smoke_web.js`，jsdom |
 | 一键自检 | **10/10 全绿** | `python scripts/verify_all.py` |
-| Git | **75 个提交** | 已推送 GitHub 私有仓库，敏感文件未入库 |
+| Git | **76 个提交** | 已推送 GitHub 私有仓库，敏感文件未入库 |
 | 意图类型 | **7 类** | device_control / schedule / **schedule_query** / knowledge / memory_write / memory_query / chat |
 | 已注册工具 | 5 个 | device_control · device_list · lock_control · create_reminder · list_schedule |
 | 图 | 2 张 | 单 Agent 主图（6 节点）+ 多 Agent 图（Supervisor + 3 子 Agent） |
@@ -74,7 +74,7 @@ END
 parse_intent ──► Supervisor（只决策，不碰工具）
                     ├── device_agent     设备控制 / 查询 / 门锁（工具白名单）
                     ├── schedule_agent   创建提醒 / 查询日程
-                    └── knowledge_agent  说明书问答（RAG 本地检索版）
+                    └── knowledge_agent  说明书问答（用户可导入 + 语义召回）
                           │
                           ▼
                     执行前冲突检测 → 共用 agent/execution.py 同一份执行原语
@@ -118,7 +118,7 @@ parse_intent ──► Supervisor（只决策，不碰工具）
 | F10 | 场景行为记忆 | ⚠️ | 有 scene 类型，仅在无其他记忆时写（防重复） |
 | F11 | 记忆召回 / 遗忘 / 撤销 | ✅ | 加权召回 + 主动硬删除 + 自然衰减 |
 | F12 | 记忆权限控制 | ✅ | L1 访客 ~ L4 管理员，**召回阶段就过滤** |
-| F13 | RAG 知识问答 | ⚠️ | 内置说明书片段 + 检索 + 大模型生成；检索层可接本地 embedding，知识库规模仍很小 |
+| F13 | RAG 知识问答 | ✅ | 用户可导入说明书（落库 `knowledge_doc`）+ 本地 embedding 语义召回 + 大模型生成；无关查询被向量阈值过滤 |
 | F14 | 主动服务 | ❌ | 需定时任务 + 触发条件，未做 |
 | F15 | 多 Agent 协同 | ✅ | Supervisor + 3 子 Agent，工具白名单 + 冲突检测 + 失败隔离 |
 | F16 | 视觉分析 | ❌ | 低优先级 |
@@ -219,7 +219,7 @@ N1 + N2 加起来一天，能把"不错的作品"抬成"能打的作品"。
 | 模型挂了怎么办？ | 四重降级：LLM→规则、Redis→内存、向量→Jaccard、工具失败→兜底话术 |
 | 多 Agent 会不会削弱安全？ | 不会：Supervisor 只决策不碰工具，护栏仍在唯一位置，**子 Agent 共用同一份执行原语** |
 | 怎么做多租户？ | `family_id` 全链路穿透（设备/记忆/会话/任务/场景），跨家庭一律 403 且**零副作用** |
-| 怎么保证质量？ | **277 单测 + 54 评测（红线一票否决）+ 43 项端到端 + 32 项前端冒烟**，四层各抓不同的东西 |
+| 怎么保证质量？ | **296 单测 + 54 评测（红线一票否决）+ 43 项端到端 + 32 项前端冒烟**，四层各抓不同的东西 |
 | 遇到过最难查的 bug？ | **`ok` 配失败**：工具报 `success:false` 但注册中心 `ok:true`，界面显示已执行、设备没动。这个坑踩了三次，最后收成一个 `tool_succeeded()` |
 
 ### 六之二、评测体系实战：拦截一次真实回归

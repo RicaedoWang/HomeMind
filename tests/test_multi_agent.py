@@ -148,8 +148,8 @@ async def test_agent_exception_is_isolated():
 # ---------------- 知识检索 ----------------
 
 def test_knowledge_retrieve_hits_relevant_doc():
-    """检索能命中相关说明书片段。"""
-    hits = retrieve("空调滤网怎么清洗", top_k=2)
+    """检索能命中相关说明书片段（内置常识兜底）。"""
+    hits = retrieve("空调滤网怎么清洗", "f1", top_k=2)
     assert hits, "应检索到相关文档"
     assert "滤网" in hits[0][0] + hits[0][1]
 
