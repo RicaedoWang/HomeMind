@@ -1,0 +1,64 @@
+<Slide style={{ width: 1280, height: 720, position: 'relative', overflow: 'hidden', background: '#0B1120', fontFamily: '微软雅黑' }}>
+    <Box style={{ height: 110, paddingLeft: 64, paddingRight: 64, paddingTop: 34, flexDirection: 'row', alignItems: 'center', gap: 18 }}>
+        <Box style={{ width: 4, height: 34, background: '#FB7185' }} />
+        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>三个坑，每个都值几百行代码</Text>
+    </Box>
+
+    <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', gap: 34 }}>
+        <Box style={{ width: 716, flexDirection: 'column', gap: 14 }}>
+            <Box style={{ flex: 1, flexDirection: 'row', gap: 20, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '20px 24px' }}>
+                <Text style={{ fontSize: 40, fontWeight: 700, color: 'rgba(251,113,133,0.55)', fontFamily: 'Consolas', lineHeight: 1, width: 44 }}>01</Text>
+                <Box style={{ width: 604 }}>
+                    <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC' }}>模型不知道今天是几号</Text>
+                    <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.65, marginTop: 8 }}>
+                        prompt 里写着"示例：2026-10-14T09:00:00"，模型把它当成了现在。<br />
+                        用户建"今日任务"，条目一落地就显示<span style={{ color: '#FB7185' }}>逾期 5 天</span>。
+                    </Text>
+                </Box>
+            </Box>
+
+            <Box style={{ flex: 1, flexDirection: 'row', gap: 20, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '20px 24px' }}>
+                <Text style={{ fontSize: 40, fontWeight: 700, color: 'rgba(251,113,133,0.55)', fontFamily: 'Consolas', lineHeight: 1, width: 44 }}>02</Text>
+                <Box style={{ width: 604 }}>
+                    <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC' }}>ok 配失败：报了成功，其实没动</Text>
+                    <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.65, marginTop: 8 }}>
+                        工具返回 <span style={{ fontFamily: 'Consolas' }}>success:false</span>，注册中心却仍是 <span style={{ fontFamily: 'Consolas' }}>ok:true</span>。<br />
+                        顺藤还揪出更狠的：自建门锁联动会<span style={{ color: '#FB7185' }}>反向把门锁上</span>，零报错。
+                    </Text>
+                </Box>
+            </Box>
+
+            <Box style={{ flex: 1, flexDirection: 'row', gap: 20, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '20px 24px' }}>
+                <Text style={{ fontSize: 40, fontWeight: 700, color: 'rgba(251,113,133,0.55)', fontFamily: 'Consolas', lineHeight: 1, width: 44 }}>03</Text>
+                <Box style={{ width: 604 }}>
+                    <Text style={{ fontSize: 20, fontWeight: 700, color: '#F8FAFC' }}>我的测试把自己的数据删了</Text>
+                    <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.65, marginTop: 8 }}>
+                        评测每条用例都会重置设备库，而设备库没做隔离——<br />
+                        跑一次评测，<span style={{ color: '#FB7185' }}>你家里的 16 台设备全没了</span>。
+                    </Text>
+                </Box>
+            </Box>
+        </Box>
+
+        <Box style={{ width: 402, flexDirection: 'column', justifyContent: 'space-between' }}>
+            <Box style={{ background: 'rgba(251,113,133,0.08)', border: '1px solid rgba(251,113,133,0.40)', borderRadius: 10, padding: '26px 26px' }}>
+                <Text style={{ fontSize: 13, color: '#FB7185', letterSpacing: 2, fontWeight: 700 }}>共同点</Text>
+                <Text style={{ fontSize: 22, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.6, marginTop: 14 }}>
+                    都不是"功能没做"，<br />是"做了但错了，<br />而且测试没抓到"。
+                </Text>
+            </Box>
+
+            <Box style={{ background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '26px 26px' }}>
+                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.70)', lineHeight: 1.85 }}>
+                    所以后来立了条规矩：<br />
+                    <span style={{ color: '#38BDF8' }}>修完一个 bug，必须补一条能复现它的用例，并做反向验证</span>——把修复改回去，确认那条用例真的会红。
+                </Text>
+            </Box>
+        </Box>
+    </Box>
+
+    <Box style={{ height: 64, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居多智能体中枢</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>11 / 13</Text>
+    </Box>
+</Slide>

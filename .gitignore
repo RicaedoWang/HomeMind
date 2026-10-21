@@ -20,3 +20,8 @@ data/
 # 评测产物：报告含应答全文，随代码频繁变动，入库只会制造噪音 diff
 reports/
 .eval-cache/
+
+# PPT 工具的本地工作缓存
+.slidep/
+# PPT 生成过程的图片缓存
+HomeMind答辩/.cache/

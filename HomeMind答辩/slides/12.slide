@@ -1,0 +1,57 @@
+<Slide style={{ width: 1280, height: 720, position: 'relative', overflow: 'hidden', background: '#0B1120', fontFamily: '微软雅黑' }}>
+    <Box style={{ height: 110, paddingLeft: 64, paddingRight: 64, paddingTop: 34, flexDirection: 'row', alignItems: 'center', gap: 18 }}>
+        <Box style={{ width: 4, height: 34, background: '#38BDF8' }} />
+        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>它现在还不能做什么</Text>
+    </Box>
+
+    <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', gap: 48 }}>
+        <Box style={{ width: 320, justifyContent: 'center', background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '32px 28px' }}>
+            <Text style={{ fontSize: 30, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.5 }}>
+                主动说清楚<br />哪里没做好
+            </Text>
+            <Box style={{ width: 56, height: 3, background: '#38BDF8', marginTop: 24 }} />
+            <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.58)', lineHeight: 1.85, marginTop: 22 }}>
+                被问出来才承认，<br />比主动标注难看一百倍。<br />下面这些我都能说清"为什么还没做"。
+            </Text>
+        </Box>
+
+        <Box style={{ width: 720, flexDirection: 'column', gap: 16 }}>
+            <Box style={{ flex: 1, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '20px 26px' }}>
+                <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <Text style={{ fontSize: 18, fontWeight: 700, color: '#F8FAFC' }}>跑的是降级实现</Text>
+                    <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.42)' }}>代码就绪，换配置即可</Text>
+                </Box>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.8, marginTop: 10 }}>
+                    Redis 代码完整但本机没起服务，跑进程内存 ｜ Milvus 没接，用的是字符 bigram Jaccard<br />
+                    MySQL 只有建表 DDL ｜ Docker Compose 文件在，没实际起过
+                </Text>
+            </Box>
+
+            <Box style={{ flex: 1, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 10, padding: '20px 26px' }}>
+                <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <Text style={{ fontSize: 18, fontWeight: 700, color: '#F8FAFC' }}>根本没做的</Text>
+                    <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.42)' }}>规划里有，时间不够</Text>
+                </Box>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.8, marginTop: 10 }}>
+                    多轮指代消解——说"把它关了"，它不知道"它"是哪台 ｜ 主动服务 ｜ 从行为日志学习惯<br />
+                    设备别名只做到房间级："卧室灯"认得出，"卧室那盏"认不出
+                </Text>
+            </Box>
+
+            <Box style={{ flex: 1, background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.35)', borderRadius: 10, padding: '20px 26px' }}>
+                <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <Text style={{ fontSize: 18, fontWeight: 700, color: '#38BDF8' }}>下一步先做这两个</Text>
+                </Box>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.66)', lineHeight: 1.8, marginTop: 10 }}>
+                    ① 把评测红线挂到 GitHub Actions——让"能拦住回归"变成仓库里有据可查的事实<br />
+                    ② 把 Redis 真跑起来——三层记忆从"设计"变成"实测"，这一条最能提气
+                </Text>
+            </Box>
+        </Box>
+    </Box>
+
+    <Box style={{ height: 64, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居多智能体中枢</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>12 / 13</Text>
+    </Box>
+</Slide>

@@ -1,0 +1,74 @@
+<Slide style={{ width: 1280, height: 720, position: 'relative', overflow: 'hidden', background: '#0B1120', fontFamily: '微软雅黑' }}>
+    <Box style={{ height: 110, paddingLeft: 64, paddingRight: 64, paddingTop: 34, flexDirection: 'row', alignItems: 'center', gap: 18 }}>
+        <Box style={{ width: 4, height: 34, background: '#38BDF8' }} />
+        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>不是什么都交给一个大模型</Text>
+    </Box>
+
+    <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', gap: 40 }}>
+        <Box style={{ width: 400, flexDirection: 'column', gap: 18, justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 26, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.55 }}>
+                Supervisor 只决策，<br />不碰工具
+            </Text>
+            <Box style={{ width: 56, height: 3, background: '#38BDF8' }} />
+            <Text style={{ fontSize: 18, color: 'rgba(248,250,252,0.62)', lineHeight: 1.8 }}>
+                三个子 Agent 各有工具白名单——设备管家调不动日程，日程秘书碰不了门锁。
+            </Text>
+            <Text style={{ fontSize: 18, color: 'rgba(248,250,252,0.62)', lineHeight: 1.8 }}>
+                执行前做冲突检测：同一台设备被要求"开"和"关"，直接挂起不执行。
+            </Text>
+
+            <Box style={{ background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.30)', borderRadius: 10, padding: '22px 24px', marginTop: 6 }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', letterSpacing: 2, fontWeight: 700 }}>多 Agent 会不会削弱安全</Text>
+                <Text style={{ fontSize: 18, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.6, marginTop: 10 }}>
+                    不会——两张图共用同一份执行原语。
+                </Text>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.7, marginTop: 8 }}>
+                    护栏仍然只有一个位置，多一个 Agent 不会多一个绕过口。
+                </Text>
+            </Box>
+        </Box>
+
+        <Box style={{ width: 712, flexDirection: 'column', justifyContent: 'space-between', gap: 8 }}>
+            <Box style={{ height: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 8 }}>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.62)' }}>parse_intent 解析出 2 个任务</Text>
+            </Box>
+
+            <Text style={{ fontSize: 18, color: 'rgba(56,189,248,0.55)', textAlign: 'center' }}>↓</Text>
+
+            <Box style={{ height: 76, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.55)', borderRadius: 8 }}>
+                <Box>
+                    <Text style={{ fontSize: 21, fontWeight: 700, color: '#38BDF8', textAlign: 'center' }}>Supervisor</Text>
+                    <Text style={{ fontSize: 14, color: 'rgba(248,250,252,0.55)', textAlign: 'center', marginTop: 4 }}>只负责分派，不直接调用任何工具</Text>
+                </Box>
+            </Box>
+
+            <Text style={{ fontSize: 18, color: 'rgba(56,189,248,0.55)', textAlign: 'center' }}>↓</Text>
+
+            <Box style={{ height: 58, flexDirection: 'row', alignItems: 'center', gap: 14, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 8, paddingLeft: 20, paddingRight: 20 }}>
+                <Text style={{ fontSize: 17, fontWeight: 700, color: '#F8FAFC', width: 130 }}>device_agent</Text>
+                <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)' }}>设备控制 / 查询 / 门锁</Text>
+            </Box>
+
+            <Box style={{ height: 58, flexDirection: 'row', alignItems: 'center', gap: 14, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 8, paddingLeft: 20, paddingRight: 20, marginLeft: 32 }}>
+                <Text style={{ fontSize: 17, fontWeight: 700, color: '#F8FAFC', width: 130 }}>schedule_agent</Text>
+                <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)' }}>创建提醒 / 查询日程</Text>
+            </Box>
+
+            <Box style={{ height: 58, flexDirection: 'row', alignItems: 'center', gap: 14, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 8, paddingLeft: 20, paddingRight: 20, marginLeft: 64 }}>
+                <Text style={{ fontSize: 17, fontWeight: 700, color: '#F8FAFC', width: 130 }}>knowledge_agent</Text>
+                <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)' }}>说明书问答（本地检索）</Text>
+            </Box>
+
+            <Text style={{ fontSize: 18, color: 'rgba(56,189,248,0.55)', textAlign: 'center' }}>↓</Text>
+
+            <Box style={{ height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', background: 'rgba(251,113,133,0.08)', border: '1px solid rgba(251,113,133,0.40)', borderRadius: 8 }}>
+                <Text style={{ fontSize: 16, color: '#FB7185', fontWeight: 700 }}>共用 agent/execution.py —— 治理只有一处实现</Text>
+            </Box>
+        </Box>
+    </Box>
+
+    <Box style={{ height: 64, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居多智能体中枢</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>06 / 13</Text>
+    </Box>
+</Slide>

@@ -1,0 +1,66 @@
+<Slide style={{ width: 1280, height: 720, position: 'relative', overflow: 'hidden', background: '#0B1120', fontFamily: '微软雅黑' }}>
+    <Box style={{ height: 110, paddingLeft: 64, paddingRight: 64, paddingTop: 34, flexDirection: 'row', alignItems: 'center', gap: 18 }}>
+        <Box style={{ width: 4, height: 34, background: '#38BDF8' }} />
+        <Text style={{ fontSize: 36, fontWeight: 700, color: '#F8FAFC', letterSpacing: 0.5 }}>一个账号，一个家</Text>
+    </Box>
+
+    <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', gap: 52 }}>
+        <Box style={{ width: 660, flexDirection: 'column', gap: 10 }}>
+            <Box style={{ height: 54, flexDirection: 'row', alignItems: 'center', gap: 14, background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.55)', borderRadius: 8, paddingLeft: 22, paddingRight: 22 }}>
+                <Text style={{ fontSize: 15, color: '#38BDF8', fontFamily: 'Consolas', fontWeight: 700 }}>JWT</Text>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.78)' }}>登录签发 token，里面带着 family_id</Text>
+            </Box>
+
+            <Text style={{ fontSize: 16, color: 'rgba(56,189,248,0.50)', textAlign: 'center' }}>↓</Text>
+
+            <Box style={{ flex: 1, flexDirection: 'column', gap: 8 }}>
+                <Box style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 16, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 6, paddingLeft: 22, paddingRight: 22 }}>
+                    <Text style={{ fontSize: 15, color: '#38BDF8', fontFamily: 'Consolas', width: 88 }}>设备</Text>
+                    <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)' }}>列表 / 控制 / 增删改，一律按家庭过滤</Text>
+                </Box>
+                <Box style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 16, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 6, paddingLeft: 22, paddingRight: 22 }}>
+                    <Text style={{ fontSize: 15, color: '#38BDF8', fontFamily: 'Consolas', width: 88 }}>记忆</Text>
+                    <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)' }}>唯一键含 family_id，同 key 不会互相覆盖</Text>
+                </Box>
+                <Box style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 16, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 6, paddingLeft: 22, paddingRight: 22 }}>
+                    <Text style={{ fontSize: 15, color: '#38BDF8', fontFamily: 'Consolas', width: 88 }}>会话</Text>
+                    <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)' }}>短期记忆按家庭 + 成员分桶</Text>
+                </Box>
+                <Box style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 16, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 6, paddingLeft: 22, paddingRight: 22 }}>
+                    <Text style={{ fontSize: 15, color: '#38BDF8', fontFamily: 'Consolas', width: 88 }}>任务</Text>
+                    <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)' }}>提醒与家务任务，别家查不到也删不掉</Text>
+                </Box>
+                <Box style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 16, background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 6, paddingLeft: 22, paddingRight: 22 }}>
+                    <Text style={{ fontSize: 15, color: '#38BDF8', fontFamily: 'Consolas', width: 88 }}>场景</Text>
+                    <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)' }}>批量动作逐台校验，越权设备直接 400</Text>
+                </Box>
+            </Box>
+        </Box>
+
+        <Box style={{ width: 440, flexDirection: 'column', gap: 18, justifyContent: 'space-between' }}>
+            <Box>
+                <Text style={{ fontSize: 25, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.55 }}>
+                    隔离做得早，<br />多用户功能才加得动
+                </Text>
+                <Text style={{ fontSize: 17, color: 'rgba(248,250,252,0.60)', lineHeight: 1.8, marginTop: 14 }}>
+                    V1.0 先把 family_id 铺进每一层，后来的注册、邀请码、自建场景才不用返工。
+                </Text>
+            </Box>
+
+            <Box style={{ background: 'rgba(56,189,248,0.06)', border: '1px solid rgba(56,189,248,0.28)', borderRadius: 10, padding: '24px 26px' }}>
+                <Text style={{ fontSize: 13, color: '#38BDF8', letterSpacing: 2, fontWeight: 700 }}>一个刻意的取舍</Text>
+                <Text style={{ fontSize: 19, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.6, marginTop: 12 }}>
+                    越权返回 403，不是 404
+                </Text>
+                <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.75, marginTop: 10 }}>
+                    404 等于告诉对方"这个 id 存在，只是不属于你"——那是免费的资源枚举线索。宁可说"无权"，也不给探测机会。
+                </Text>
+            </Box>
+        </Box>
+    </Box>
+
+    <Box style={{ height: 64, paddingLeft: 64, paddingRight: 64, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)' }}>HomeMind · 智能家居多智能体中枢</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.40)', fontFamily: 'Consolas' }}>09 / 13</Text>
+    </Box>
+</Slide>
