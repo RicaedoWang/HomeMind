@@ -38,6 +38,7 @@ from .long_term import (
     LongTermMemory,
     role_level,
 )
+from .embedder import get_embedder
 from .semantic import SemanticMemory, jaccard_similarity
 from .short_term import ShortTermMemory
 
@@ -85,7 +86,15 @@ class MemoryService:
     ) -> None:
         self.settings = settings or get_settings()
         self.long_term = long_term or LongTermMemory()
-        self.semantic = semantic or SemanticMemory()
+        # 语义召回走本地 embedding（真向量），失败自动降级为字面匹配。
+        # 注意：**只有召回用向量，去重仍用 jaccard_similarity**——见 find_duplicate
+        # 的 docstring，这个分工是刻意的。
+        if semantic is not None:
+            self.semantic = semantic
+        elif self.settings.embedding.enabled:
+            self.semantic = SemanticMemory(embed_fn=get_embedder())
+        else:
+            self.semantic = SemanticMemory()
         self.short_term = short_term or ShortTermMemory()
 
     # ---------------- 写入 ----------------
@@ -277,6 +286,20 @@ class MemoryService:
 
         只在**本家庭内**比对：两家的"喜欢空调 26 度"是两条各自独立的记忆，
         不能因为内容像就合并成一条。
+
+        **为什么这里用字面相似度而不是向量**（2026-10-21 实测后确认）：
+
+        bge-small-zh 对「把客厅灯打开」和「把客厅灯关掉」给出的余弦相似度是
+        **0.855** —— 它分不清「开」和「关」。而这里的阈值正好是 0.85，
+        一旦换成向量，这两条会被判成同一条并互相覆盖：
+        用户刚说完"开灯"，之前"关灯"的记忆就没了。
+
+        所以分工是刻意的：
+        - **去重怕误伤** → 用精确的字面匹配（Jaccard），宁可漏合并，不可错合并
+        - **召回怕漏** → 用语义向量，字面零重合也要能找回来
+
+        同一个 embedding 模型在两个场景下结论相反，这不是模型的问题，
+        是「合并」和「召回」两种操作的错误代价不对称。
         """
         best: tuple[Any, float] | None = None
         for r in self.long_term.list_by_member(member_id, viewer_role="L4",

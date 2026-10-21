@@ -18,6 +18,12 @@ PyJWT>=2.8.0
 redis>=5.0.0
 httpx>=0.27.0
 
+# Local embedding for semantic memory (ONNX runtime, no PyTorch needed).
+# Optional: if missing or model download fails, recall degrades to
+# character bigram Jaccard (still works, just no synonym matching).
+# Download the model ahead of time: python scripts/download_embedding.py
+fastembed>=0.4.0
+
 # ---- web demo UI (only needed by scripts/web_ui.py) ----
 # NOTE: gradio 6 changed the Chatbot API - it no longer accepts the old
 # [(question, answer)] tuples, only [{role, content}] messages.

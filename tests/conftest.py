@@ -29,6 +29,9 @@ os.environ["HM_USE_MOCK_LLM"] = "true"
 # 整套测试会去连真实 Redis：依赖外部服务、别人机器上跑必挂、可重复性归零。
 # `HM_USE_MOCK_LLM` 一直是强制赋值，这里保持一致更省心。
 os.environ["HM_REDIS_ENABLED"] = "false"
+# embedding 同理：测试不许加载真模型（90MB、首次几秒、没网直接挂）。
+# 语义召回在测试里走字符 bigram Jaccard，确定性且零耗时。
+os.environ["HM_EMBEDDING_ENABLED"] = "false"
 os.environ.setdefault("HM_LOG_LEVEL", "ERROR")
 
 

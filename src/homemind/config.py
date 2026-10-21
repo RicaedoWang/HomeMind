@@ -89,6 +89,23 @@ class RedisConfig:
 
 
 @dataclass
+class EmbeddingConfig:
+    """本地 embedding 配置（语义召回的真向量模式）。
+
+    默认开启：模型走懒加载，第一次真要算向量时才加载；没装 fastembed 或模型下载
+    失败都会自动降级为字符 bigram Jaccard，**不会让服务起不来**。
+
+    关掉它的场景：不想要那 90MB 模型、或机器磁盘紧张。
+    关掉后语义召回退回字面匹配，功能可用但认不出同义改写。
+    """
+
+    enabled: bool = field(default_factory=lambda: _get_bool("HM_EMBEDDING_ENABLED", True))
+    model: str = field(
+        default_factory=lambda: os.getenv("HM_EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5")
+    )
+
+
+@dataclass
 class ToolConfig:
     """工具调用治理配置：超时、重试、熔断（对齐 FR-TOOL-003）。"""
 
@@ -129,6 +146,7 @@ class Settings:
     log_level: str = field(default_factory=lambda: os.getenv("HM_LOG_LEVEL", "INFO"))
     llm: LLMConfig = field(default_factory=LLMConfig)
     redis: RedisConfig = field(default_factory=RedisConfig)
+    embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
     tool: ToolConfig = field(default_factory=ToolConfig)
     memory: MemoryConfig = field(default_factory=MemoryConfig)
     safety: SafetyConfig = field(default_factory=SafetyConfig)
