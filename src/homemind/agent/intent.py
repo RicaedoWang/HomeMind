@@ -24,6 +24,23 @@ logger = get_logger("agent.intent")
 
 # ---------------- 词表 ----------------
 ROOMS = ("客厅", "主卧", "次卧", "卧室", "厨房", "书房", "玄关", "卫生间", "阳台")
+
+# 口语房间名 → 系统房间名。
+# 用户说"卧室灯"，设备库里那间房叫"主卧"，于是 `_find_device` 的
+# `dev.room == "主卧"` 对不上，回一句"没有找到设备"。
+# 这不是用户的问题——"卧室"和"主卧"本来就是同一间屋的两种说法。
+#
+# 归一化放在**抽出 room 之后**，而不是在 _find_device 里补救：
+# room 一旦归成"主卧"，下游按房间精确匹配立刻就对，一行都不用改。
+# 在匹配函数里加别名是治标——每个调用方都得记得补一遍。
+ROOM_ALIAS = {
+    "卧室": "主卧", "睡房": "主卧", "主房": "主卧", "大卧室": "主卧",
+    "次卧室": "次卧",
+    "洗手间": "卫生间", "厕所": "卫生间", "浴室": "卫生间",
+    "入户": "玄关", "门口": "玄关", "门厅": "玄关",
+    "大厅": "客厅", "起居室": "客厅",
+}
+
 DEVICES = ("灯", "空调", "窗帘", "电视", "风扇", "门锁", "地暖", "热水器", "音箱")
 DEVICE_ALIAS = {"灯": "灯", "电灯": "灯", "空调": "空调", "冷气": "空调",
                 "窗帘": "窗帘", "电视": "电视", "风扇": "风扇", "门锁": "门锁",
@@ -44,6 +61,21 @@ SCHEDULE_WORDS = ("提醒", "记得", "日程", "安排", "闹钟", "提示我",
 # 这类查询句会被误伤成"创建日程"。只匹配"动词 + 任务"的创建句式。
 TASK_ADD_PATTERN = re.compile(
     r"(新加|添加|新增|创建|新建|记个|加个|加一下|帮我加)[^，。；！？]{0,10}(任务|待办|事项)")
+
+# 日程**查询**表达（V1.4）。必须排在创建判定之前，因为查询句里同样含
+# "提醒""日程"这些词，光看名词分不开"给我建一条"和"看看我有哪些"。
+# 只匹配"查询动词 + 日程名词"或"限定词 + 日程名词"这两种搭配，
+# 不做单名词匹配——单名词会把"提醒我九点关灯"也吞成查询。
+#
+# 为什么单列一个"什么"：`split_multi_intent` 会把"还有"当连接词切走，
+# "还有什么提醒" 到这一层已经变成"什么提醒"。"还有"既是连接词又是
+# 查询短语的一部分，这个歧义没法在切分阶段解决，只能在正则里兜住残句。
+# 兜得住是因为它后面必须紧跟日程名词——"提醒我什么时候出门"不会命中。
+SCHEDULE_QUERY_PATTERN = re.compile(
+    r"(看看|查一?下|查查|查看|有哪些|有什么|还有什么|什么|列一下|念一下|告诉我|翻一下)"
+    r"[^，。；！？]{0,8}(提醒|日程|安排|闹钟|待办|计划)"
+    r"|(我的|今天的|明天的|这周的|本周的)[^，。；！？]{0,4}(提醒|日程|安排|闹钟|待办|计划)"
+)
 KNOWLEDGE_WORDS = ("怎么", "如何", "为什么", "什么意思", "说明书", "怎么用",
                    "多久", "几次", "清洗", "保养", "故障", "坏了")
 # 注意：不要往这里加"多少"——"空调多少度"是查设备状态，属于设备控制而非知识问答。
@@ -133,9 +165,20 @@ def _extract_entities(
 
     # 房间按名字长度降序匹配："儿童房"要先于"房"命中。
     # 用户自建房间并入词表，否则"把儿童房的灯关掉"抽不出房间。
-    room = next((r for r in sorted((*extra_rooms, *ROOMS), key=len, reverse=True)
-                 if r in text), None)
+    # 别名表的 key 也一并并入：别名若只写进 ROOM_ALIAS、不写进匹配词表，
+    # 就永远抽不出来，等于一张死表——"睡房"这种只存在于别名里的说法
+    # 会直接漏掉，room 抽成 None，消歧全废。
+    room_words = (*extra_rooms, *ROOMS, *ROOM_ALIAS)
+    room = next((r for r in sorted(room_words, key=len, reverse=True) if r in text), None)
     if room:
+        # 别名只在"本家庭确实没有这个名字的房间、而目标房间存在"时生效。
+        # 反过来做会出事：用户自己建了一间叫"卧室"的房，别名硬把它重写成
+        # "主卧"，用户说的明明是自己建的那间，灯却开到了另一间去。
+        # extra_rooms 为空（没传 family_id 或读库失败）时按乐观处理——
+        # 那种情况下手里只有内置词表，别名是唯一能让"卧室"落地的办法。
+        alias = ROOM_ALIAS.get(room)
+        if alias and room not in extra_rooms and (alias in extra_rooms or not extra_rooms):
+            room = alias
         entities["room"] = room
 
     device = None
@@ -224,7 +267,19 @@ def _classify(text: str, extra_devices: tuple[str, ...] = ()) -> tuple[IntentTyp
     # 也要压过设备判定——同"提醒我九点关灯"一个道理。
     has_schedule = (any(w in text for w in SCHEDULE_WORDS)
                     or bool(TASK_ADD_PATTERN.search(text)))
+    has_schedule_query = bool(SCHEDULE_QUERY_PATTERN.search(text))
     has_knowledge = any(w in text for w in KNOWLEDGE_WORDS)
+
+    # 查询必须排在创建**之前**（V1.4）。两句话都含"提醒"，光看名词分不开：
+    #   "提醒我九点关灯" → 要建一条提醒（有副作用）
+    #   "看看我的提醒"   → 只想看一眼（零副作用）
+    # 原来两者都判成 schedule，执行层只有 create_reminder 一条路，于是
+    # "看看今天的提醒"真的建出一条标题叫"看看"、时间今天 09:00 的提醒。
+    # 顺序为什么是"查询判定在前"而不是反过来：查询被当创建 = 凭空多一条脏数据，
+    # 要用户自己发现并手动删；创建被当查询 = 用户重复说一遍。前者更烦。
+    # 这跟"误执行比漏执行严重"是同一条判断标准。
+    if has_schedule_query:
+        return IntentType.SCHEDULE_QUERY, 0.85
 
     # 提醒判定必须压过设备判定（顺序改过一次，见下）：
     # "提醒我晚上九点关灯" 里既有"灯"（设备）又有"关"（动作），
@@ -304,6 +359,12 @@ class IntentParser:
                     # 时间解析不出来要降置信度，触发澄清
                     if entities.get("needs_clarify"):
                         confidence = min(confidence, 0.5)
+                elif intent_type == IntentType.SCHEDULE_QUERY:
+                    # 查询是只读的：不抽 content、不抽 scheduled_at。
+                    # 一旦让它带上时间字段，下游就可能拿它去 create_reminder——
+                    # 本次要修的就是这个 bug，不能在查询分支里再留一条后路。
+                    for noise in ("action", "device_name", "room", "value", "delta"):
+                        entities.pop(noise, None)
                 intents.append(Intent(type=intent_type, confidence=confidence,
                                       raw_text=segment, entities=entities))
             logger.info("rule parsed %s intent(s)", len(intents),
@@ -338,7 +399,7 @@ class IntentParser:
         prompt = f"""{describe_now()}
 
 {home_ctx}解析下面的用户输入，输出一个 JSON 数组，每个元素包含：
-- type: device_control / schedule / knowledge / memory_query / memory_write / chat
+- type: device_control / schedule / schedule_query / knowledge / memory_query / memory_write / chat
 - confidence: 0~1 之间的浮点数
 - entities: 对象，可包含这些字段
     device_name: 灯 / 空调 / 窗帘 / 门锁 / 电视 / 风扇
@@ -358,10 +419,15 @@ class IntentParser:
 - 用户问"现在几点/今天几号/星期几" → type 用 chat（照常闲聊，不要编设备操作）
 - 用户想查看 **Agent 记住的习惯与偏好**（"我的习惯""记录了什么""看你记录"）→ type 用 memory_query
 - 用户想查看 **已安排的提醒/日程/待办**（"查看我的日程""今天有什么安排""我的提醒"）
-  → type 用 schedule，**不要**判成 memory_query。两者都带"我的"，但一个问记忆、一个问日程，
-  判错的后果是：用户问日程，助手却答"你习惯早睡"，答非所问。
+  → type 用 schedule_query，**不是** schedule、也**不是** memory_query。
+  三者都带"我的"或"提醒"，必须分清：
+    · schedule_query = 只看一眼，**不创建任何东西**
+    · schedule = 要新建一条提醒（用户给了"做什么"和"什么时候"）
+    · memory_query = 问 Agent 记住了什么习惯偏好
+  判错的后果很具体：查询判成 schedule 会凭空建一条标题叫"看看"的提醒；
+  查询判成 memory_query 会答非所问（用户问日程，助手答"你习惯早睡"）。
 - 用户在描述习惯或偏好（"我喜欢""我习惯""记住"）→ type 用 memory_write，不要当成控制指令
-- 用户要求提醒或安排 → type 用 schedule
+- 用户要求提醒或安排（含"提醒我…""记得…""到点…"）→ type 用 schedule
 - 确实在下指令控制设备 → type 用 device_control
 - **两者都像时一律判 schedule**："提醒我晚上九点关灯"虽然有设备（灯）和动作（关），
   但它是把动作安排到未来，不是现在执行。判成 device_control 会让灯当场灭掉，

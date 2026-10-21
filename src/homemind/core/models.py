@@ -15,10 +15,17 @@ class IntentType(str, Enum):
 
     V0.1 只落地 device_control / schedule / chat 三类，
     knowledge 在 V0.8 接 RAG 后启用。
+
+    V1.4 把 schedule 拆成了「创建」与「查询」两类。原因很实在：
+    schedule 这一个值同时背着"给我建一条提醒"和"看看我有什么提醒"，
+    而执行层只有 create_reminder 一条路——于是用户问"看看今天的提醒"，
+    系统会把"看看"当成提醒内容、把今天 09:00 当成时间，凭空建一条垃圾数据。
+    一个意图类型只能对应一种副作用，否则误创建永远治不干净。
     """
 
     DEVICE_CONTROL = "device_control"
-    SCHEDULE = "schedule"
+    SCHEDULE = "schedule"              # 创建提醒（有副作用）
+    SCHEDULE_QUERY = "schedule_query"  # 查看已有提醒（只读，零副作用）
     KNOWLEDGE = "knowledge"
     MEMORY_WRITE = "memory_write"  # 用户在表达偏好/习惯，不是在下指令
     MEMORY_QUERY = "memory_query"  # 用户想查看 Agent 记住了什么

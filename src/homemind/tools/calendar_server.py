@@ -92,13 +92,32 @@ async def _handle_create_reminder(args: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _handle_list_schedule(args: dict[str, Any]) -> dict[str, Any]:
-    """查询本家庭的日程列表（别的家庭查不到）。"""
+    """查询本家庭的日程列表（别的家庭查不到）。
+
+    `message` 是必给的，不是可选装饰：应答节点只把带 message 的工具结果
+    念给用户，"查到 0 条"如果只回 `count: 0`，它会认为这次调用无话可说，
+    然后掉进闲聊兜底模板——用户问"看看今天的提醒"，得到"我在听。
+    可以说「我喜欢…」让我记住习惯"。数据全对，话说得完全不搭。
+    """
     keyword: str | None = args.get("keyword")
     family_id: str = args.get(FAMILY_ARG) or DEFAULT_FAMILY_ID
     items = [s for s in _SCHEDULES if s["family_id"] == family_id]
     if keyword:
         items = [s for s in items if keyword in s["content"]]
-    return {"success": True, "schedules": items, "count": len(items)}
+
+    if not items:
+        message = "现在没有任何提醒。要我帮你安排一条吗？"
+    else:
+        items = sorted(items, key=lambda s: s.get("scheduled_at") or "")
+        lines = []
+        for s in items:
+            when = (s.get("scheduled_at") or "")[:16].replace("T", " ")
+            mark = "" if s.get("status", "pending") == "pending" else "（已完成）"
+            lines.append(f"· {when} {s['content']}{mark}")
+        message = f"你共有 {len(items)} 条提醒：\n" + "\n".join(lines)
+
+    return {"success": True, "schedules": items, "count": len(items),
+            "message": message}
 
 
 def build_calendar_tools() -> list[ToolSpec]:
@@ -113,7 +132,10 @@ def build_calendar_tools() -> list[ToolSpec]:
                     "content": {"type": "string", "description": "提醒内容"},
                     "scheduled_at": {
                         "type": "string",
-                        "description": "ISO 8601 格式时间，如 2026-10-14T09:00:00",
+                        "description": (
+                            "ISO 8601 绝对时间字符串。必须用系统提示里给出的"
+                            "「现在」推算，禁止照抄任何示例日期。"
+                        ),
                     },
                 },
                 "required": ["content", "scheduled_at"],

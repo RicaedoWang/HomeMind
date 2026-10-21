@@ -126,6 +126,14 @@ def _intent_to_task(intent_dict: dict[str, Any]) -> dict[str, Any] | None:
                 "arguments": arguments, "status": TaskStatus.PENDING.value,
                 "requires_confirm": False}
 
+    if intent_type == IntentType.SCHEDULE_QUERY.value:
+        # 只读查询走 list_schedule（工具本身 mutating=False），不需要确认。
+        # 关键是不能落进下面 SCHEDULE 那条分支——那条分支无条件 create_reminder，
+        # 于是"看看今天的提醒"会建出一条标题叫"看看"的提醒。这是本次修的 bug。
+        return {"task_id": task_id, "intent": intent_dict, "tool_name": "list_schedule",
+                "arguments": {}, "status": TaskStatus.PENDING.value,
+                "requires_confirm": False}
+
     if intent_type == IntentType.SCHEDULE.value:
         if entities.get("needs_clarify"):
             # 时间解析不出来：不猜，直接生成澄清任务（对齐 FR-INT-004）

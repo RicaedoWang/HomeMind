@@ -222,6 +222,25 @@ def main() -> int:
                   and not any(t["id"] == sid for t in st["tasks"]),
                   f"DELETE /schedules/{sid} → {r.status_code}")
 
+        # ---- V1.4：查询与创建必须分开（真链路，不是单测）
+        # 单测能验证意图分类，但验证不了"真起服务 + JWT + 完整图"之后，
+        # 用户问一句查询到底有没有在库里留下垃圾数据。
+        before_count = len([t for t in me.state()["tasks"] if t.get("source") == "ai"])
+        ask = me.post("/api/console/assistant", {"text": "看看今天的提醒"}).json()
+        after_count = len([t for t in me.state()["tasks"] if t.get("source") == "ai"])
+        check("问一句日程查询，不建出任何提醒",
+              after_count == before_count,
+              f"提醒数 {before_count} → {after_count}；答复：{(ask.get('answer') or '')[:30]}")
+        check("查询的答复不是闲聊兜底",
+              "我在听" not in (ask.get("answer") or ""),
+              (ask.get("answer") or "")[:36])
+
+        # ---- V1.4：说不清是哪台时反问，不许静默挑一台
+        ambiguous = me.post("/api/console/assistant",
+                            {"text": "打开灯", "confirmed": False}).json()
+        check("说不清哪台灯时会反问", "哪一台" in (ambiguous.get("answer") or ""),
+              (ambiguous.get("answer") or "")[:40])
+
         # ---- 需求 3：可点元素的后端支撑
         r = me.post("/api/console/habits/forget", {"memory_key": "preference:不存在的键"})
         check("忘掉不存在的记忆 → 404", r.status_code == 404,

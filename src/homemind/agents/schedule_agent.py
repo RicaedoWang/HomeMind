@@ -18,7 +18,11 @@ class ScheduleAgent(BaseAgent):
     domain = "日程提醒"
     description = "创建提醒、查询日程，含时间解析校验"
     allowed_tools = {"create_reminder", "list_schedule"}
-    handled_intents = {"schedule"}
+    # schedule_query 也必须进来：V1.4 把查询从 schedule 里拆出来之后，
+    # 如果这里只认 "schedule"，多 Agent 图里就没有任何 Agent 接手
+    # "看看我的日程"——用户问一句，一条工具都不执行，静默什么都不发生。
+    # 主图（graph.py）认、多 Agent 图不认，就是典型的"改了一处漏了一处"。
+    handled_intents = {"schedule", "schedule_query"}
 
     async def handle(
         self,
@@ -56,13 +60,17 @@ class ScheduleAgent(BaseAgent):
                 continue
 
             arguments = task.get("arguments", {})
-            if not arguments.get("content") or not arguments.get("scheduled_at"):
-                outcome.skipped_tasks.append({
-                    "task_id": task.get("task_id"),
-                    "tool_name": tool_name,
-                    "reason": "缺少内容或时间，需澄清",
-                })
-                continue
+            # "必须有内容和时间"是**创建**的门槛，查询不需要——list_schedule
+            # 压根不接这两个参数。不区分工具名的话，查询会在这一步被当成
+            # "缺少内容或时间，需澄清"直接跳过，用户永远查不出结果。
+            if tool_name == "create_reminder":
+                if not arguments.get("content") or not arguments.get("scheduled_at"):
+                    outcome.skipped_tasks.append({
+                        "task_id": task.get("task_id"),
+                        "tool_name": tool_name,
+                        "reason": "缺少内容或时间，需澄清",
+                    })
+                    continue
 
             result_dict, applied_mem, degraded = await execute_task(registry, task, state)
             outcome.tool_results.append(result_dict)

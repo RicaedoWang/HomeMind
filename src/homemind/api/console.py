@@ -51,7 +51,7 @@ from ..tools.calendar_server import delete_schedule, get_schedules, reset_schedu
 from ..core.tenancy import DEFAULT_FAMILY_ID, FAMILY_ARG
 from ..tools.device_server import devices_of, get_device_states
 from ..tools.device_store import DEVICE_TYPES, get_device_store
-from ..tools.registry import default_registry
+from ..tools.registry import default_registry, tool_succeeded
 
 logger = get_logger("api.console")
 
@@ -507,7 +507,8 @@ async def control_device(
     # 以前只判 result.ok，于是"不支持的动作"也被当成功，
     # 消息中心还记了一条"打开了客厅灯"——灯根本没动。
     # 消息中心不许放假消息，所以必须看工具自己报的 success。
-    succeeded = result.ok and (result.data or {}).get("success", True)
+    # 判定收在 registry.tool_succeeded 一处——这个坑踩过三次，别再手写了。
+    succeeded = tool_succeeded(result)
 
     # 真实事件：只有真的动了才记，失败/被拦的不记（消息中心不放假消息）
     if succeeded:
@@ -852,7 +853,7 @@ async def activate_scene(
         result = await registry.call("device_control", arguments)
         # `result.ok` 只代表"工具被调用了"，device_control 对不支持的动作
         # 返回 success=False 但不抛错。只看 ok 会出现"场景说全成功、灯其实没动"。
-        succeeded = result.ok and (result.data or {}).get("success", True)
+        succeeded = tool_succeeded(result)
         affected.append({"deviceId": device_id, "name": device.name,
                          "ok": succeeded,
                          "message": (result.data or {}).get("message", "")})
@@ -1041,14 +1042,24 @@ async def complete_task(
         device = devices_of(family_id).get(device_id)
         if device is None:
             continue
-        action = "turn_off" if device_id == "front_door_lock" else "turn_on"
+        # 判断"这是不是门锁"必须看 device_type，不能看 device_id 字面量。
+        # 原来写的是 `device_id == "front_door_lock"`，V1.3 允许用户自建门锁之后：
+        # 自建锁的 id 不叫这个名字 → 落到 else 分支 → 给 lock_control 传 turn_on
+        # → handler 里 `power = (action == "unlock")` 把 turn_on 判成"上锁"，
+        # 于是用户完成一个"出门记得锁门"的任务，期望联动开锁、实际把门锁上，
+        # 还回 success=True。**反向操作、零报错**，比"没动"难查得多。
+        # 一句话：id 是数据，device_type 才是语义；拿数据判断语义，用户一自建就崩。
+        is_lock = device.device_type == "lock"
+        # 任务完成时的联动语义：门锁默认上锁（做完"关门"类任务要锁门），
+        # 其余设备一律打开。默认取安全侧，不替用户开门。
+        action = "lock" if is_lock else "turn_on"
         result = await default_registry().call(
-            "lock_control" if device.device_type == "lock" else "device_control",
-            {"action": "lock" if device_id == "front_door_lock" else action,
-             "device_name": device.name, "room": device.room, FAMILY_ARG: family_id},
+            "lock_control" if is_lock else "device_control",
+            {"action": action, "device_name": device.name,
+             "room": device.room, FAMILY_ARG: family_id},
         )
         linked.append({"deviceId": device_id, "name": device.name,
-                       "ok": result.ok,
+                       "ok": tool_succeeded(result),
                        "message": (result.data or {}).get("message", "")})
 
     ok_linked = [l["name"] for l in linked if l["ok"]]

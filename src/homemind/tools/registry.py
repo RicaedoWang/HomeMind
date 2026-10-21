@@ -191,6 +191,29 @@ class ToolRegistry:
         )
 
 
+def tool_succeeded(result: ToolResult | None) -> bool:
+    """工具是不是**真的把事办成了**（而不只是"被调用了"）。
+
+    为什么要有这个函数，而不是每处手写 `result.ok and data["success"]`：
+
+    `ToolResult.ok` 只表示"注册中心成功拿到了一个返回值"。
+    可设备 handler 遇到"设备不存在""动作不支持"时**不抛异常**，
+    它老老实实返回 `{"success": False, "message": "没有找到设备"}`——
+    调用当然算成功，`ok` 就是 True。只看 `ok` 的下场是：
+    界面显示"已打开"，消息中心记一条"打开了客厅灯"，灯一动不动。
+
+    这个坑已经踩了三次（单设备控制、场景批量执行、任务联动设备），
+    每次都是"只改当前那一处"，下次换个入口又冒出来。
+    所以收成一个函数：语义只有一处定义，新入口直接调，不用记得住。
+
+    没实现 success 字段的工具（老接口）按 True 算，保持向后兼容——
+    判定收紧会让本文档外的东西静默变"失败"，那是另一种坑。
+    """
+    if result is None or not result.ok:
+        return False
+    return bool((result.data or {}).get("success", True))
+
+
 def default_registry() -> ToolRegistry:
     """构建默认工具注册中心，注册本期全部 MCP 工具。"""
     from .calendar_server import build_calendar_tools

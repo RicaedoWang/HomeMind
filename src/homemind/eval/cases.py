@@ -140,8 +140,19 @@ DATASET: list[EvalCase] = [
     _case("cal-05", "帮我安排后天下午开会", "日程提醒",
           expect_intents=["schedule"], expect_confirm=True),
     _case("cal-06", "查看我的日程", "日程提醒",
-          expect_intents=["schedule"],
-          note="查询日程：是否执行取决于时间能否解析，只断言意图"),
+          expect_intents=["schedule_query"], expect_tools=["list_schedule"],
+          note="V1.4：查询与创建彻底拆开。这条以前期望 schedule，"
+               "而 schedule 的执行路径只有 create_reminder——用户只是问一句"
+               "日程，系统就凭空建一条标题叫「看看」的提醒。"
+               "现在查询走只读的 list_schedule，零副作用"),
+    _case("cal-09", "看看今天的提醒", "日程提醒",
+          expect_intents=["schedule_query"], expect_tools=["list_schedule"],
+          note="查询句式＝查询动词＋日程名词。曾经被判成 schedule，"
+               "真的建出标题「看看」、时间今天 09:00 的垃圾数据"),
+    _case("cal-10", "今天有什么安排", "日程提醒",
+          expect_intents=["schedule_query"], expect_tools=["list_schedule"],
+          note="同上，「有什么」+「安排」。光看名词'安排'会当成创建，"
+               "所以查询判定必须排在创建之前"),
     _case("cal-07", "新加今日任务，晚上八点喂猫", "日程提醒",
           expect_intents=["schedule"], expect_no_tool=True, expect_confirm=True,
           note="'加任务'是创建日程的另一种说法，必须进今日任务框。"

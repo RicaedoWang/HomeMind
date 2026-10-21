@@ -143,33 +143,54 @@ def ensure_family(family_id: str) -> bool:
     return created
 
 
+def _resolve_devices(
+    device_name: str | None,
+    room: str | None = None,
+    family_id: str | None = None,
+) -> list[DeviceState]:
+    """按名称找出**所有**能对上的设备，可带房间限定，且只在指定家庭内找。
+
+    返回列表而不是单个设备，是为了让"说不清是哪一台"这件事能被上层看见。
+
+    原来这里直接 `return candidates[0]`，等于**静默替用户挑一台**：
+    家里客厅灯、主卧灯都在，用户说"打开灯"，它闷头把客厅灯开了。
+    用户会以为这系统在抽风——灯确实亮了，但不是他要的那盏。
+    更糟的是这种"猜对了没人夸、猜错了没人报"的行为，日志里连痕迹都没有。
+
+    匹配优先级：完全匹配 > 名称子串（配合房间消歧）。
+    仍然是单向子串（用户的词必须是设备名的一部分），刻意不做模糊相似度：
+    "卧室灯"和"主卧灯"字符重合 2/3，一旦按重合度配，就会开始乱配——
+    宁可说"听不懂"，也不要替用户按下开关。
+    """
+    bucket = devices_of(family_id)
+    if not device_name:
+        if room:
+            return [dev for dev in bucket.values() if dev.room == room]
+        return []
+
+    # 完全匹配优先：说"主卧灯"就只认主卧灯，不要再去捞"灯"
+    exact = [dev for dev in bucket.values() if dev.name == device_name]
+    if exact:
+        return exact
+
+    candidates = [d for d in bucket.values() if device_name in d.name]
+    if room:
+        candidates = [d for d in candidates if d.room == room]
+    return candidates
+
+
 def _find_device(
     device_name: str | None,
     room: str | None = None,
     family_id: str | None = None,
 ) -> DeviceState | None:
-    """按名称模糊匹配设备，可带房间限定，且**只在指定家庭内找**。
+    """取唯一匹配的设备；没有或有歧义都返回 None。
 
-    匹配优先级：完全匹配名称 > 名称子串 > 房间 + 类型子串
+    需要"知道是不是有歧义"的调用方，用 `_resolve_devices` 自己判；
+    这个函数留给"本来就只可能有一台"的场景（如按类型找门锁）。
     """
-    bucket = devices_of(family_id)
-    if not device_name:
-        if room:
-            for dev in bucket.values():
-                if dev.room == room:
-                    return dev
-        return None
-
-    # 完全匹配
-    for dev in bucket.values():
-        if dev.name == device_name:
-            return dev
-
-    # 子串匹配（"灯" 命中 "客厅灯"，配合 room 可消歧）
-    candidates = [d for d in bucket.values() if device_name in d.name]
-    if room:
-        candidates = [d for d in candidates if d.room == room]
-    return candidates[0] if candidates else None
+    candidates = _resolve_devices(device_name, room, family_id)
+    return candidates[0] if len(candidates) == 1 else None
 
 
 async def _handle_device_control(args: dict[str, Any]) -> dict[str, Any]:
@@ -180,12 +201,25 @@ async def _handle_device_control(args: dict[str, Any]) -> dict[str, Any]:
     value: float | None = args.get("value")
     family_id = _resolve_family(args)
 
-    device = _find_device(device_name, room, family_id)
-    if device is None:
+    candidates = _resolve_devices(device_name, room, family_id)
+    if not candidates:
         return {
             "success": False,
             "message": f"没有找到设备：{device_name or room or '未指定'}",
         }
+    if len(candidates) > 1:
+        # 有歧义就反问，不许猜。猜错的成本是"灯亮了但不是你要的那盏"——
+        # 用户要重新下一次指令，而且完全不知道系统依据什么挑的。
+        # 反问最多多一句话，且用户能立刻纠正。
+        names = "、".join(c.name for c in candidates)
+        return {
+            "success": False,
+            "ambiguous": True,
+            "candidates": [{"device_id": c.device_id, "name": c.name, "room": c.room}
+                           for c in candidates],
+            "message": f"{names}都对得上，你说的是哪一台？",
+        }
+    device = candidates[0]
 
     if action == "turn_on":
         device.power = True
@@ -291,9 +325,24 @@ async def _handle_lock_control(args: dict[str, Any]) -> dict[str, Any]:
     """门锁控制（高危）。"""
     action: str = args.get("action", "")
     family_id = _resolve_family(args)
-    device = _find_device(args.get("device_name") or "门锁", None, family_id)
-    if device is None:
+    # 动作先校验，再找设备：动作非法时找不找得到设备都不该执行。
+    # 以前这里没有这道关，`device.power = (action == "unlock")` 意味着
+    # **任何不是 unlock 的动作都会被当成上锁**，还返回 success=True。
+    # 于是上游把 turn_on 传进来（V1.3 自建门锁就踩了这个），
+    # 用户以为在开门，门被锁上了，全程零报错——错误被静默吞掉比报错难查一百倍。
+    if action not in ("lock", "unlock"):
+        return {"success": False,
+                "message": f"门锁只支持 lock / unlock，收到「{action}」"}
+    lock_candidates = _resolve_devices(args.get("device_name") or "门锁", None, family_id)
+    if not lock_candidates:
         return {"success": False, "message": "没有找到门锁设备"}
+    if len(lock_candidates) > 1:
+        # 家里有两把锁（大门、后门）时，不能替用户决定开哪一把。
+        # 高危设备的"猜一个"比普通设备更不能接受。
+        names = "、".join(c.name for c in lock_candidates)
+        return {"success": False, "ambiguous": True,
+                "message": f"{names}都对得上，你要开哪一把？"}
+    device = lock_candidates[0]
     device.power = action == "unlock"
     # 落库。门锁走的是独立 handler，不经过 _handle_device_control 那段统一写回，
     # 漏了这一步的后果是：开锁成功、消息中心记了一笔，重启后门锁状态还是旧的。

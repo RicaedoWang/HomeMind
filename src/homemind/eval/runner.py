@@ -256,6 +256,13 @@ async def run_eval(
     db_path 用独立文件且每次重建：评测环境必须与用户真实环境隔离，
     也让"记忆类"用例从干净状态出发（否则查记忆的结果取决于上次跑了啥）。
 
+    **设备库同样必须隔离**，理由一样但后果更狠：每条用例前都调
+    `reset_devices()`，而它实现是"删库再播种"。设备库如果指向真实的
+    `data/homemind_content.db`，每跑一次评测就把用户家里的设备和自建房间
+    清空一次；评测进程结束后没人再触发懒播种，库就一直空着——
+    用户打开控制台看到零台设备，还以为是程序坏了。
+    （这条踩过：conftest 补了隔离、端到端脚本补了隔离，唯独评测漏了。）
+
     graph_factory 用于注入自定义图（评测自检时会用到：
     塞一个故意出错的解析器，验证评测确实能把回退抓出来）。
     """
@@ -267,6 +274,14 @@ async def run_eval(
     db_file.parent.mkdir(parents=True, exist_ok=True)
 
     memory = MemoryService(long_term=LongTermMemory(db_path=db_path))
+
+    # 设备库换成评测专用文件，跑完恢复现场（pytest 里 conftest 已经换过一次，
+    # 不能把它的 temp store 覆盖掉就不管了，否则后续用例会碰到真实库）。
+    from ..tools.device_store import DeviceStore, get_device_store, set_device_store
+
+    previous_device_store = get_device_store()
+    set_device_store(DeviceStore(str(db_file.parent / "eval_content.db")))
+
     if graph_factory is not None:
         graph = graph_factory(memory)
     else:
@@ -275,24 +290,30 @@ async def run_eval(
     started = time.perf_counter()
     results: list[CaseResult] = []
 
-    for case in cases:
-        # 关键：每条用例前重置 Mock 状态，保证可复现
-        reset_devices()
-        reset_schedules()
+    try:
+        for case in cases:
+            # 关键：每条用例前重置 Mock 状态，保证可复现
+            reset_devices()
+            reset_schedules()
 
-        case_start = time.perf_counter()
-        state = initial_state(case.input, trace_id=uuid.uuid4().hex[:8])
-        result = await graph.ainvoke(state)
-        elapsed = int((time.perf_counter() - case_start) * 1000)
+            case_start = time.perf_counter()
+            state = initial_state(case.input, trace_id=uuid.uuid4().hex[:8])
+            result = await graph.ainvoke(state)
+            elapsed = int((time.perf_counter() - case_start) * 1000)
 
-        failures, actual = _check(case, result)
-        results.append(CaseResult(
-            case=case,
-            passed=not failures,
-            failures=failures,
-            elapsed_ms=elapsed,
-            **actual,
-        ))
+            failures, actual = _check(case, result)
+            results.append(CaseResult(
+                case=case,
+                passed=not failures,
+                failures=failures,
+                elapsed_ms=elapsed,
+                **actual,
+            ))
+    finally:
+        # 恢复现场：评测是"借用"设备库，不是"接管"。
+        # 不恢复的话，评测跑完进程里还挂着一个指向临时文件的 store，
+        # 同进程后续的测试会带着一套空设备继续跑，症状是"单跑能过、连跑就挂"。
+        set_device_store(previous_device_store)
 
     total_ms = int((time.perf_counter() - started) * 1000)
     return EvalReport(results=results, elapsed_ms=total_ms, mode=mode)
