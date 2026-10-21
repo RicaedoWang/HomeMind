@@ -25,3 +25,6 @@ reports/
 .slidep/
 # PPT 生成过程的图片缓存
 HomeMind答辩/.cache/
+
+# Office / WPS 打开文件时生成的临时锁文件
+~$*

@@ -174,14 +174,15 @@ class Scene:
 # ---------------------------------------------------------------- 工具函数
 
 def _connect(db_path: str) -> sqlite3.Connection:
-    """统一连接入口：必须设 row_factory，否则拿到的行是元组不是字典。
+    """统一连接入口（委托给 core.db，集中配置 WAL 与外键）。
 
-    `auth/store.py` 在这上面踩过一次（`row["password_hash"]` 报 TypeError），
-    两个模块刻意用同样的写法，免得在同一类坑里摔第二跤。
+    以前这里各自写 `sqlite3.connect` + `row_factory`，四个存储模块各一份。
+    加 PRAGMA 优化时差点又改四处漏一处——收进 `core.db.connect()` 之后，
+    连接参数只有一处定义。
     """
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
+    from ..core.db import connect
+
+    return connect(db_path)
 
 
 def new_invite_code(existing: set[str]) -> str:

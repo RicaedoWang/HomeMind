@@ -7,7 +7,7 @@
     <Box style={{ height: 546, paddingLeft: 64, paddingRight: 64, flexDirection: 'column' }}>
         <Box style={{ flexDirection: 'row', gap: 34, justifyContent: 'space-between' }}>
             <Box style={{ width: 250 }}>
-                <Text style={{ fontSize: 84, fontWeight: 700, color: '#38BDF8', fontFamily: 'Consolas', lineHeight: 1 }}>247</Text>
+                <Text style={{ fontSize: 84, fontWeight: 700, color: '#38BDF8', fontFamily: 'Consolas', lineHeight: 1 }}>263</Text>
                 <Text style={{ fontSize: 19, fontWeight: 700, color: '#F8FAFC', marginTop: 10 }}>条单元测试</Text>
                 <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', lineHeight: 1.65, marginTop: 7 }}>
                     快、确定性、不联网，30 秒跑完

@@ -102,16 +102,15 @@ class AccountStore:
         self._init_schema()
 
     def _connect(self) -> Any:
-        """统一连接入口：必须设 row_factory，否则取到的是元组不是字典。
+        """统一连接入口（委托给 core.db，集中配置 WAL 与外键）。
 
-        踩过的坑：`get_password_hash` 单独 connect 时漏了这一行，
-        结果 `row["password_hash"]` 报 TypeError——所有连接都从这里出，杜绝复发。
+        踩过的坑：`get_password_hash` 单独 connect 时漏了 row_factory，
+        结果 `row["password_hash"]` 报 TypeError——所有连接都从 `core.db.connect`
+        出，配置只有一处，杜绝复发。
         """
-        import sqlite3
+        from ..core.db import connect
 
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+        return connect(self.db_path)
 
     def _init_schema(self) -> None:
         with self._connect() as conn:

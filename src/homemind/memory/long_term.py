@@ -1,14 +1,24 @@
 """长期结构化记忆（对齐 FR-MEM-002、FR-MEM-006）。
 
 存储后端设计：
-- **默认 SQLite**：标准库自带、零配置、开箱即跑，适合单机开发与演示。
-- **可选 MySQL**：设置 HM_DB_BACKEND=mysql 时切换，表结构与 sql/init.sql 完全一致，
-  切过去不用改任何业务代码。
+- **只用 SQLite**：标准库自带、零配置、开箱即跑。
+- **MySQL 未接入**：`sql/init.sql` 里有对齐的 DDL，但代码里**没有任何 MySQL 连接实现**
+  （没有 pymysql、没有 mysql-connector、也没有 `HM_DB_BACKEND` 分支）。
+  想接需要自己写一套 Store 实现，不是改配置。
 
-为什么默认不用 MySQL：
-你这台机器的 MySQL 服务得手动 Start-Service 才起来，拿它当默认后端，
-等于让"能不能跑 demo"取决于你今天有没有记得开服务——那太蠢了。
-存储抽象成接口，等真上生产换 MySQL 只是改一行配置的事。
+为什么没接 MySQL，以及什么时候才该接：
+本项目是单机单进程部署。实测 50 个家庭 / 750 台设备 / 4,500 条记忆 / 91 万条事件
+的库，查询全部是亚毫秒级（取一个家庭全部设备 0.038ms，取最近 20 条事件 0.045ms）。
+
+真正的切换信号是**多实例部署**，不是用户变多：
+- SQLite 是文件锁，多个进程同时写会互相阻塞，跨机器则完全不可行；
+- 需要主从、热备、慢查询分析这类在线运维能力时；
+- 团队多人改 schema、需要迁移工具链时。
+
+这三件事一件都没发生之前，换 MySQL 只是给自己加运维负担。
+
+DDL 与 `sql/init.sql` 保持一致，是为了「真要换的时候语义不跑偏」，
+**不代表现在就能换**。这句话以前写成了"换后端只改配置"——那是假的，已更正。
 
 对应能力：
     upsert      写入/更新（同 key 冲突时版本 +1 并留痕，FR-MEM-006）
@@ -91,9 +101,10 @@ class LongTermMemory:
         self._init_schema()
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+        """统一连接入口（委托给 core.db，集中配置 WAL 与外键）。"""
+        from ..core.db import connect
+
+        return connect(self.db_path)
 
     def _init_schema(self) -> None:
         """建表。字段与 sql/init.sql 的 memory_struct 保持一致。"""

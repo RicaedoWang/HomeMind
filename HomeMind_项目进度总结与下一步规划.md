@@ -14,13 +14,13 @@
 
 | 指标 | 实测值 | 备注 |
 |---|---|---|
-| Python 代码总量 | **15,093 行 / 76 个文件** | `src` + `scripts` + `tests`，`verify_all.py` 实时统计 |
-| 单元测试 | **247 passed / 约 30s** | 18 个测试文件，mock 模式确定性执行 |
+| Python 代码总量 | **15,330 行 / 78 个文件** | `src` + `scripts` + `tests`，`verify_all.py` 实时统计 |
+| 单元测试 | **263 passed / 约 30s** | 19 个测试文件，mock 模式确定性执行 |
 | 端到端评测 | **54 条，通过率 100%，红线 9/9** | `python scripts/run_eval.py`，含基线对比 |
 | 端到端验收 | **43 项全过** | `python scripts/verify_interactions.py`，真起服务 + 真实 JWT |
 | 前端无头冒烟 | **32 项** | `node scripts/smoke_web.js`，jsdom |
 | 一键自检 | **10/10 全绿** | `python scripts/verify_all.py` |
-| Git | **71 个提交** | 已推送 GitHub 私有仓库，敏感文件未入库 |
+| Git | **73 个提交** | 已推送 GitHub 私有仓库，敏感文件未入库 |
 | 意图类型 | **7 类** | device_control / schedule / **schedule_query** / knowledge / memory_write / memory_query / chat |
 | 已注册工具 | 5 个 | device_control · device_list · lock_control · create_reminder · list_schedule |
 | 图 | 2 张 | 单 Agent 主图（6 节点）+ 多 Agent 图（Supervisor + 3 子 Agent） |
@@ -32,7 +32,7 @@
 |---|---|---|
 | Redis（短期记忆） | 代码完整含降级，**本机没起服务**，跑进程内存 | "接口已就绪，本地用内存模式；换 Redis 只改配置" |
 | Milvus（语义检索） | **仅设计未接**，跑字符 bigram Jaccard | "降级算法已能跑通去重与检索，接向量库是替换实现类" |
-| MySQL | 只有 `sql/init.sql` 的 DDL | "表结构一一对齐，当前 SQLite，换库改连接串" |
+| MySQL | 只有 `sql/init.sql` 的 DDL，**代码里零实现** | "表结构对齐，但没接。换它得自己写 Store，触发条件是**多实例部署**——SQLite 是文件锁，跨机器不行。跟用户数无关" |
 | Docker Compose | 文件在，**本机没实际起过** | 别吹成"已容器化部署" |
 | 能耗数据 | 种子值，不是真实电表 | 控制台那块用电图是演示数据 |
 | 物理设备 | 全是 Mock，无扫码发现（米家那种） | 有单独的《真实硬件接入方案》 |
@@ -219,7 +219,7 @@ N1 + N2 加起来一天，能把"不错的作品"抬成"能打的作品"。
 | 模型挂了怎么办？ | 四重降级：LLM→规则、Redis→内存、向量→Jaccard、工具失败→兜底话术 |
 | 多 Agent 会不会削弱安全？ | 不会：Supervisor 只决策不碰工具，护栏仍在唯一位置，**子 Agent 共用同一份执行原语** |
 | 怎么做多租户？ | `family_id` 全链路穿透（设备/记忆/会话/任务/场景），跨家庭一律 403 且**零副作用** |
-| 怎么保证质量？ | **247 单测 + 54 评测（红线一票否决）+ 43 项端到端 + 32 项前端冒烟**，四层各抓不同的东西 |
+| 怎么保证质量？ | **263 单测 + 54 评测（红线一票否决）+ 43 项端到端 + 32 项前端冒烟**，四层各抓不同的东西 |
 | 遇到过最难查的 bug？ | **`ok` 配失败**：工具报 `success:false` 但注册中心 `ok:true`，界面显示已执行、设备没动。这个坑踩了三次，最后收成一个 `tool_succeeded()` |
 
 ### 六之二、评测体系实战：拦截一次真实回归
