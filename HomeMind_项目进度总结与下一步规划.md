@@ -1,6 +1,6 @@
 # HomeMind 项目进度总结与下一步规划
 
-> 更新时间：2026-10-21 凌晨（第九次更新，含 V1.2.2 时间修复与 V1.3 自定义电器，见第十二章） ｜ 项目路径：`C:\Users\13141\Desktop\HomeMind`
+> 更新时间：2026-10-21 凌晨（第十次更新，含 V1.4 三笔遗留债，见第十三章） ｜ 项目路径：`C:\Users\13141\Desktop\HomeMind`
 > 运行环境：conda `homemind`（Python 3.11） ｜ 定位：面向智能家居的 Agent 中枢——听得懂人话、记得住习惯、管得住风险。
 > 所有状态均为**实测结果**，不是计划中的自嗨。降级实现一律如实标注。
 
@@ -10,22 +10,23 @@
 
 | 指标 | 实测值 | 备注 |
 |---|---|---|
-| Python 代码总量 | **14,131 行 / 73 个文件** | `src` + `scripts` + `tests`，由 `verify_all.py` 实时统计 |
-| 单元测试 | **191 passed / 约 21s** | 15 个测试文件，mock 模式确定性执行 |
-| 端到端评测 | **52 条用例，通过率 100%，红线 9/9** | `python scripts/run_eval.py`，含基线对比，**实测拦截过两次真实回归** |
+| Python 代码总量 | **15,093 行 / 76 个文件** | `src` + `scripts` + `tests`，由 `verify_all.py` 实时统计 |
+| 单元测试 | **247 passed / 约 30s** | 18 个测试文件，mock 模式确定性执行 |
+| 端到端评测 | **54 条用例，通过率 100%，红线 9/9** | `python scripts/run_eval.py`，含基线对比，**实测拦截过两次真实回归** |
 | 一键自检 | **10/10 全绿** | `python scripts/verify_all.py`，含前端无头冒烟（jsdom，32 项交互） |
-| 端到端验收 | **40/40 全过** | `python scripts/verify_interactions.py`，真起服务 + 真实 JWT |
+| 端到端验收 | **43/43 全过** | `python scripts/verify_interactions.py`，真起服务 + 真实 JWT |
 | **Web 控制台** | **已完成并真实使用** | `python scripts/console_server.py` → http://127.0.0.1:8000（自动开浏览器） |
 | **多租户隔离** | **两家庭四账号，跨家庭 403** | V1.0 完成，三条硬指标实测通过（见《多用户与隔离实现方案》） |
 | **可自定义设备** | **设备与房间落 SQLite，全 CRUD** | V1.3 完成：内置可删、删光不复活、自建词表进意图层 |
+| **查询与创建分离** | **查询零副作用、走只读工具** | V1.4 完成：`SCHEDULE_QUERY` 只读意图，不再凭空造提醒 |
 | 演示界面 | Gradio Web（4 面板） | `python scripts/web_ui.py` → http://127.0.0.1:7860（保留，链路可视化更强） |
 | 已注册工具 | 5 个 | device_control / device_list / lock_control / create_reminder / list_schedule |
-| 意图类型 | 6 类 | device_control / schedule / knowledge / memory_write / memory_query / chat |
+| 意图类型 | 7 类 | device_control / schedule / schedule_query / knowledge / memory_write / memory_query / chat |
 | 图节点 | 6 + 多 Agent 子图 | 主链路 6 节点；V0.8 起 Supervisor 分派三个子 Agent |
 | 大模型 | **真模型已打通** | DeepSeek（OpenAI 兼容协议），Key 存 `.env`，失败自动降级规则 |
 | 记忆库真实数据 | 3 条 | `data/homemind.db`：深圳 2 条（空调 26 度、睡觉关窗帘）+ 青岛 1 条（空调 20 度） |
 | 交付文档 | 7 份 | SRS + 项目规划 + README + 技术栈清单 + 界面设计文档 + 多用户与隔离实现方案 + 真实硬件接入方案 |
-| **Git 仓库** | **67 个模块化提交** | 敏感文件（`.env` / `data/*.db`）未入库，`.gitattributes` 统一换行 |
+| **Git 仓库** | **69 个模块化提交** | 敏感文件（`.env` / `data/*.db`）未入库，`.gitattributes` 统一换行 |
 
 ### 诚实标注：跑的是降级实现的部分
 
@@ -566,3 +567,98 @@ scheduled_at: ISO8601 时间字符串（如 2026-10-14T09:00:00）
 - 没有物理设备发现（米家/涂鸦那种扫码接入），全部手工登记
 - **日程查询仍被当成创建**：`IntentType` 没有 query 维度，`graph.py` 无条件 `create_reminder`。等拍板
 - 动作卡 `ok:true` 配失败，语义未统一
+
+---
+
+## 十三、V1.4：三笔遗留债（2026-10-21 凌晨）
+
+没有新功能，全是还债。三笔债里有两笔比最初描述的更严重。
+
+### 13.1 日程查询被当成创建
+
+实测：
+
+```
+'看看今天的提醒'  → 建一条标题「看看」、今天 09:00 的提醒
+'今天有什么安排'  → 建一条标题「有什么」的提醒
+'我的日程'      → 反问「请告诉我提醒的时间」
+```
+
+根因不是某一行写错，是**类型划分缺了一维**：`SCHEDULE` 同时背着
+"建一条"和"看看有哪些"，执行层只有 `create_reminder` 一条路。
+**一个意图类型对应两种副作用，误创建永远治不干净。**
+
+拆出 `SCHEDULE_QUERY`（只读、`list_schedule`、不需确认），判定排在创建之前。
+改动必须同步三处：主图 `graph.py`、多 Agent 图 `schedule_agent.handled_intents`、
+LLM prompt。只改主图 → 评测当场挂 `cal-06 工具不符：期望 list_schedule，实际 []`。
+
+另外两个隐蔽点：`schedule_agent` 里"必须有 content+scheduled_at"的校验是创建的门槛，
+不按工具名区分会把查询当"缺少内容"跳过；`list_schedule` 不带 `message` 时
+应答节点掉进闲聊兜底（"我在听，可以说我喜欢…"）——只读工具也得会说人话。
+
+### 13.2 ok 配失败 + 门锁反向操作
+
+`ToolResult.ok` 只表示"拿到返回值"。设备 handler 遇到"没找到/动作不支持"
+不抛异常，只返回 `success: false`，`ok` 仍是 True。这个坑踩过三次
+（单设备/场景/联动），收成 `registry.tool_succeeded()` 一处定义。
+
+**顺藤摸到更狠的**：`complete_task` 用字面量 `device_id == "front_door_lock"`
+判断是不是锁。V1.3 允许自建门锁后，自建锁走 else 分支传 `turn_on`，
+而 handler 里 `power = (action == "unlock")` —— 任何非 unlock 都被当成上锁，
+还返回 success。用户完成"出门记得锁门"的任务，期望开锁、**实际锁上了门，零报错**。
+
+修法：看 `device.device_type`（id 是数据，类型才是语义）；`lock_control` 拒绝非法动作。
+加两条白盒守门用例焊死入口。
+
+### 13.3 设备匹配不再猜
+
+`_find_device` 原来 `return candidates[0]`，用户说"打开灯"会闷头开客厅灯——
+灯确实亮了但不是他要的那盏，日志里连痕迹都没有。
+改成返回候选集合，多个就反问「客厅灯、主卧灯都对得上，你说的是哪一台？」
+
+`ROOM_ALIAS`（卧室→主卧）在意图层抽 room 时归一化。两个边界：
+别名只在"本家庭没这个房间名、目标存在"时生效（否则劫持用户自建房间）；
+别名 key 必须并入匹配词表（否则"睡房"永远抽不出来）。
+**刻意不做模糊相似度**——宁可说听不懂，也不要替用户按下开关。
+
+### 13.4 事故：评测清空了用户真实设备库
+
+提交前拍快照发现 `data/homemind_content.db` 从 room/device/seed_log = 8/16/2
+变成 **0/0/0**。根因：`eval/runner.py` 每条用例调 `reset_devices()`（删库再播种），
+device store 没隔离 → 清的是真实库；评测结束无人触发懒播种，库一直空着。
+
+conftest 补过、verify_interactions 补过，**评测这处漏了**——第三次同一类疏漏。
+现在 `run_eval()` 内部换 `data/eval_content.db`，`finally` 恢复。
+
+恢复数据时又踩一脚：`ensure_family()` 固定用深圳模板，对 `family_qd` 会播成
+10 台深圳设备。正确做法是 `reset_family(fid)` 后走 `devices_of(fid)` 懒播种。
+已恢复 8/16/2，与事故前一致。
+
+> 流程固化：**跑任何会写库的东西之前拍快照，跑完对比。数值不变才算真的隔离。**
+
+### 13.5 反向验证差点又测了寂寞
+
+第一次摘查询判定用 `str.replace` 改文件——**文件是 CRLF，按 `\n` 匹配没改到**，
+测试全绿，差点当成守住了。grep 确认后用编辑器重做，17 条立刻红。
+**改文件一律用编辑器工具，改完先 grep 确认。**
+
+### 13.6 实测
+
+| 项 | 结果 |
+|---|---|
+| 单元测试 | **247 passed**（+32 查询 / +11 结果语义 / +13 设备匹配） |
+| 端到端评测 | **54/54**，红线 9/9，无回退（cal-06 断言改准，新增 cal-09/cal-10） |
+| 端到端验收 | **43/43**（+3：查询零副作用、不落闲聊兜底、说不清哪台会反问） |
+| 前端无头冒烟 | 32 项全过 |
+| 一键自检 | 10/10 |
+
+五处反向验证全部命中（查询判定 17 红 / 门锁字面量 2 红 / 裸 ok 1 红 /
+歧义反问 3 红 / 房间别名 3 红）。
+
+### 13.7 还是没做
+
+- 设备别名只到房间级（"卧室那盏"→「主卧灯」仍未做）
+- 日程查询无时间范围过滤，"今天的"和"本周的"都返回全部
+- 门锁联动语义固定为"上锁"，不支持任务配置"开锁"
+- **仓库仍无远程**，69 个提交只在本机。gh 登录 token 已失效、`~/.ssh/config`
+  里一行裸 `ProxyCommand connect` 把 SSH 全废了（`connect` 命令不存在）
