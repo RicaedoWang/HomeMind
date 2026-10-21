@@ -149,3 +149,28 @@ def test_store_imports_core_db(rel):
     assert "core.db import connect" in src or "core.db import" in src, (
         f"{rel} 没有引用 core.db 的连接工厂"
     )
+
+
+# ---------------------------------------------------------------- 测试环境隔离
+
+def test_tests_run_without_real_redis():
+    """测试环境必须禁用 Redis，不许连真实服务。
+
+    背景：2026-10-21 本机真跑起 Redis，`.env` 里的 `HM_REDIS_ENABLED` 改成了 true。
+    测试若跟着去连真实 Redis，就变成「依赖外部服务」——别人机器上跑必挂，
+    同一份代码两次跑结果可能不同。
+
+    这条断言守的是**结果**（测试进程里 redis 必须是关的），不绑定实现方式。
+    实测过：conftest 无论是强制赋值还是 setdefault，在当前 import 顺序下都能得到
+    false（conftest 早于 dotenv 加载 .env）。所以这条用例真正能抓住的是
+    「那行被整个删掉」或「有人改成 true」。
+
+    守不住的是「强制赋值被换回 setdefault」——两种写法在当前顺序下等价，
+    只有顺序被打破才会出问题，那属于防御性问题，不是这条用例的职责。
+    """
+    from homemind.config import get_settings
+
+    assert get_settings().redis.enabled is False, (
+        "测试环境竟然启用了 Redis —— 检查 conftest.py 顶部的 HM_REDIS_ENABLED 设置。"
+        "测试必须不依赖任何外部服务"
+    )

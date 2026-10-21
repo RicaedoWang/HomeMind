@@ -22,7 +22,7 @@
                     <Text style={{ fontSize: 13, color: 'rgba(248,250,252,0.42)' }}>代码就绪，换配置即可</Text>
                 </Box>
                 <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.58)', lineHeight: 1.8, marginTop: 10 }}>
-                    Redis 代码完整但本机没起服务，跑进程内存 ｜ Milvus 没接，用的是字符 bigram Jaccard<br />
+                    Redis 已真跑单实例，但主从/备份没做 ｜ Milvus 没接，用的是字符 bigram Jaccard<br />
                     MySQL 只有建表 DDL ｜ Docker Compose 文件在，没实际起过
                 </Text>
             </Box>
@@ -44,7 +44,7 @@
                 </Box>
                 <Text style={{ fontSize: 16, color: 'rgba(248,250,252,0.66)', lineHeight: 1.8, marginTop: 10 }}>
                     ① 把评测红线挂到 GitHub Actions——让"能拦住回归"变成仓库里有据可查的事实<br />
-                    ② 把 Redis 真跑起来——三层记忆从"设计"变成"实测"，这一条最能提气
+                    ② 接本地 embedding，让语义召回认得出"空调太冷"和"温度调高点"是同一个人说的
                 </Text>
             </Box>
         </Box>

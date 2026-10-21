@@ -10,7 +10,7 @@
                 <Text style={{ fontSize: 18, fontWeight: 700, color: '#38BDF8', width: 110 }}>短期记忆</Text>
                 <Box style={{ width: 900 }}>
                     <Text style={{ fontSize: 19, fontWeight: 700, color: '#F8FAFC' }}>Redis 滑动窗口 · 带 TTL</Text>
-                    <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', marginTop: 6 }}>当前这轮对话的上下文。本机没起 Redis，实际跑进程内存（降级）</Text>
+                    <Text style={{ fontSize: 15, color: 'rgba(248,250,252,0.55)', marginTop: 6 }}>当前这轮对话的上下文。Docker 真跑，停容器会自动降级内存</Text>
                 </Box>
             </Box>
 

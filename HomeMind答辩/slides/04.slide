@@ -28,7 +28,7 @@
 
             <Box style={{ height: 42, flexDirection: 'row', alignItems: 'center', background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 6, paddingLeft: 20, paddingRight: 20, gap: 20 }}>
                 <Text style={{ fontSize: 15, fontWeight: 700, color: '#F8FAFC', width: 96 }}>记忆层</Text>
-                <Text style={{ fontSize: 14, color: 'rgba(248,250,252,0.62)' }}>短期 Redis（跑内存降级）｜ 长期 SQLite ｜ 语义字符 bigram Jaccard</Text>
+                <Text style={{ fontSize: 14, color: 'rgba(248,250,252,0.62)' }}>短期 Redis 7.4（真跑）｜ 长期 SQLite ｜ 语义字符 bigram Jaccard</Text>
             </Box>
 
             <Box style={{ height: 42, flexDirection: 'row', alignItems: 'center', background: '#16223A', border: '1px solid rgba(248,250,252,0.10)', borderRadius: 6, paddingLeft: 20, paddingRight: 20, gap: 20 }}>

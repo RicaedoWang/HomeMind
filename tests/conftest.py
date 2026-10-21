@@ -17,7 +17,18 @@ import os
 import pytest
 
 os.environ["HM_USE_MOCK_LLM"] = "true"
-os.environ.setdefault("HM_REDIS_ENABLED", "false")
+# 这里用**强制赋值**而不是 setdefault——不依赖 import 顺序。
+#
+# 2026-10-21 本机真跑起 Redis，`.env` 里的 HM_REDIS_ENABLED 改成了 true。
+# 实测：conftest 在 pytest 最早期执行，早于 dotenv 加载 .env，所以即便用
+# setdefault，此刻 os.environ 还没有这个变量，setdefault 会塞入 false，
+# 之后 dotenv 的 override=False 也不会覆盖——**当前顺序下两种写法等价**。
+#
+# 但 setdefault 依赖「conftest 一定早于任何 config 的 import」这个隐含前提。
+# 哪天有人在 conftest 之前引入 config（或插件先加载了 .env），setdefault 就失效，
+# 整套测试会去连真实 Redis：依赖外部服务、别人机器上跑必挂、可重复性归零。
+# `HM_USE_MOCK_LLM` 一直是强制赋值，这里保持一致更省心。
+os.environ["HM_REDIS_ENABLED"] = "false"
 os.environ.setdefault("HM_LOG_LEVEL", "ERROR")
 
 
