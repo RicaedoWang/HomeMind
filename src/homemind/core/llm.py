@@ -12,6 +12,11 @@
 
 3. **结构化输出做清洗**：模型爱用 ```json 包裹、爱在 JSON 前后加解释，
    这里统一剥掉，解析失败返回 None。
+
+4. **用量必须记下来**：响应体里的 `usage` 字段原来是被丢掉的，
+   导致"一次对话花多少钱"这个问题根本没法回答。现在每次调用都
+   累加到 `core/metrics.py`，成本按配置的单价估算（未配置就不给金额，
+   绝不编一个数）。
 """
 
 from __future__ import annotations
@@ -21,6 +26,7 @@ import re
 from typing import Any
 
 from ..config import get_settings
+from ..core.metrics import record_usage
 from ..core.trace import get_logger, span
 
 logger = get_logger("core.llm")
@@ -67,6 +73,11 @@ class LLMClient:
                 "temperature": temperature if temperature is not None
                 else self.settings.llm.temperature,
                 "max_tokens": max_tokens,
+                # DeepSeek V4.1（deepseek-flash / deepseek-v4-pro）默认开启思考模式，
+                # 回答会放在 reasoning_content 字段、content 字段为空。
+                # 本项目要的是"快 + 便宜"的意图解析/应答，思考链纯属浪费，
+                # 显式关掉它，让答案直接进 content，也兼容老模型（deepseek-chat 忽略此字段）。
+                "thinking": {"type": "disabled"},
             }
             try:
                 async with httpx.AsyncClient(timeout=self.settings.llm.timeout) as client:
@@ -80,7 +91,22 @@ class LLMClient:
                     )
                     resp.raise_for_status()
                     data = resp.json()
-                return data["choices"][0]["message"]["content"].strip()
+
+                # 先记用量再取内容：记录失败不该影响业务，所以放前面且本身不抛异常。
+                usage = data.get("usage") or {}
+                record_usage(
+                    model=payload.get("model") or self.settings.llm.model,
+                    prompt_tokens=usage.get("prompt_tokens", 0),
+                    completion_tokens=usage.get("completion_tokens", 0),
+                )
+
+                message = data["choices"][0]["message"]
+                content = message.get("content")
+                # 双保险：万一未来开启思考模式（content 为空），回退读思考内容，
+                # 而不是返回空字符串让上层以为模型没响应。
+                if not content and message.get("reasoning_content"):
+                    content = message["reasoning_content"]
+                return (content or "").strip()
             except Exception as exc:  # noqa: BLE001 - 模型任何异常都要吞掉并降级
                 logger.warning("llm chat failed: %s", type(exc).__name__)
                 return None

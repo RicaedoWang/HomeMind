@@ -69,7 +69,7 @@ class LLMConfig:
 
     use_mock: bool = field(default_factory=lambda: _get_bool("HM_USE_MOCK_LLM", True))
     provider: str = field(default_factory=lambda: os.getenv("HM_LLM_PROVIDER", "deepseek"))
-    model: str = field(default_factory=lambda: os.getenv("HM_LLM_MODEL", "deepseek-chat"))
+    model: str = field(default_factory=lambda: os.getenv("HM_LLM_MODEL", "deepseek-flash"))
     api_key: str = field(default_factory=lambda: os.getenv("HM_LLM_API_KEY", ""))
     base_url: str = field(default_factory=lambda: os.getenv("HM_LLM_BASE_URL", ""))
     timeout: int = field(default_factory=lambda: _get_int("HM_LLM_TIMEOUT", 30))

@@ -1,25 +1,32 @@
-"""知识问答 Agent：设备说明书 / 使用常识（F13 RAG）。
+"""知识问答 Agent：设备说明书 / 使用常识 / 本机历史（F13 RAG）。
 
-检索策略（V1.5）：
-- **用户导入的说明书**（`knowledge_doc` 表）走本地 embedding 真向量召回，
+检索策略（V1.6）——**三源合并，回答的是"你家的这台"，不是"这类设备"**：
+
+- **用户导入的说明书**（`knowledge_doc`）走本地 embedding 真向量召回，
   模型不可用时自动退化 Jaccard——详见 `memory/knowledge_store.py`。
+- **本机历史事件**（`device_event`）按设备名 / 语义词匹配，回答
+  "上次同样故障是怎么处理的、花了多少钱"。
 - **内置常识片段**（`DOCS`，5 个通用常识）用 Jaccard 字面匹配兜底。
-- 两条结果合并、按分数排序取 top_k。
 
-为什么内置常识不落库：它们是跟版本走的通用常识，用户不能删，
-按 V1.2「内置留代码、用户落库」约定留在代码里。
+## 为什么要接第三源
 
-诚实原则：检索不到就说检索不到，不让它瞎编说明书内容。
+说明书网上遍地都是，通用大模型也答得出"P4 是进水异常"。
+但通用模型不知道**你家这台**上个月因为同样的 P4 清洗过滤网、
+上次折腾到最后发现是水压问题。这一层才是别人抄不走的东西。
+
+诚实原则：三个来源都没命中就说没查到，不让它瞎编说明书内容。
 """
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from ..core.llm import get_llm_client
 from ..core.tenancy import DEFAULT_FAMILY_ID, FAMILY_ARG
 from ..memory.knowledge_store import get_knowledge_store
 from ..memory.semantic import jaccard_similarity
+from ..tools.device_event_store import get_device_event_store
 from .base import AgentOutcome, BaseAgent
 
 # 内置知识片段：（标题, 正文）。跟版本走的通用常识，只读、不落库。
@@ -58,10 +65,33 @@ def retrieve(query: str, family_id: str, top_k: int = 2) -> list[tuple[str, str,
     return merged[:top_k]
 
 
+def _format_event(event: dict[str, Any]) -> str:
+    """把一条设备事件拼成人话，供 prompt 使用和降级展示共用。
+
+    时间戳改成日期而不是原始浮点数——模型看到 `1762...` 只会一脸茫然，
+    看到 `2026-11-02` 才知道该说"上个月"还是"去年"。
+    """
+    try:
+        when = datetime.fromtimestamp(float(event.get("happened_at") or 0)).strftime("%Y-%m-%d")
+    except (ValueError, OSError, OverflowError):
+        when = "时间未知"
+
+    bits = [f"{when} {event.get('event_label') or event.get('event_type') or '记录'}"]
+    if event.get("symptom"):
+        bits.append(f"现象：{event['symptom']}")
+    if event.get("cause"):
+        bits.append(f"原因：{event['cause']}")
+    if event.get("action"):
+        bits.append(f"处理：{event['action']}")
+    if event.get("cost"):
+        bits.append(f"花费：{event['cost']} 元")
+    return "；".join(bits)
+
+
 class KnowledgeAgent(BaseAgent):
     name = "knowledge_agent"
     domain = "知识问答"
-    description = "设备说明书与家居常识问答（本地检索 + 大模型生成）"
+    description = "设备说明书、家居常识与本机历史问答（检索 + 大模型生成）"
     allowed_tools = set()  # 只回答，不操作任何设备
     handled_intents = {"knowledge"}
 
@@ -75,29 +105,50 @@ class KnowledgeAgent(BaseAgent):
         query = state.get("user_input", "")
         family_id = state.get(FAMILY_ARG, DEFAULT_FAMILY_ID)
         hits = retrieve(query, family_id, top_k=2)
+        events = get_device_event_store().find_for_query(family_id, query, limit=2)
 
-        if not hits:
-            outcome.answer = ("这个我在说明书库里没查到。可以换个说法再问，"
-                              "或者告诉我设备型号，我再帮你查。")
+        # 三源全空才算真的查不到。历史上命中但说明书没命中，照样能答
+        # （"这台上次怎么修的"这类问题，说明书里根本没有）。
+        if not hits and not events:
+            outcome.answer = ("这个我在说明书库里没查到，也没有这台设备的历史记录。"
+                              "可以换个说法再问，或者告诉我设备型号，我再帮你查。")
             outcome.ok = True
             return outcome
 
-        context = "\n".join(f"【{t}】{b}" for t, b, _ in hits)
+        blocks: list[str] = []
+        if hits:
+            blocks.append("【说明书片段】\n" + "\n".join(f"· {t}：{b}" for t, b, _ in hits))
+        if events:
+            blocks.append("【这台设备在本家庭的历史记录】\n"
+                          + "\n".join(f"· {_format_event(e)}" for e in events))
+        context = "\n\n".join(blocks)
 
         client = get_llm_client()
         if not client.enabled:
-            # 没有模型时，如实把资料原文给出——这比编造强，也比沉默强
-            outcome.answer = f"资料库里找到这段说明：{hits[0][1]}"
+            # 没有模型时如实给原文：历史优先（更个性化），其次说明书。
+            if events:
+                outcome.answer = f"你家这台设备的历史记录：{_format_event(events[0])}"
+            else:
+                outcome.answer = f"资料库里找到这段说明：{hits[0][1]}"
             outcome.degraded = True
             return outcome
 
-        system = ("你是智能家居助手，只能依据下面给出的说明书片段回答，"
-                  "不许补充片段里没有的信息。回答控制在三句话内，中文。")
-        prompt = f"说明书片段：\n{context}\n\n用户问：{query}\n请回答："
-        answer = await client.chat(prompt, system=system, max_tokens=250)
+        system = (
+            "你是智能家居助手。只能依据下面给出的说明书片段和家庭历史记录回答，"
+            "不许补充里面没有的信息。"
+            "如果历史记录里有同类问题的处理经验，必须明确指出「上次也是这样，"
+            "当时是怎么处理的」，并提醒用户参考。"
+            "没有历史记录时，就按说明书正常回答，不要编造历史。"
+            "回答控制在四句话内，中文。"
+        )
+        prompt = f"{context}\n\n用户问：{query}\n请回答："
+        answer = await client.chat(prompt, system=system, max_tokens=320)
 
         if not answer:
-            outcome.answer = f"资料库里找到这段说明：{hits[0][1]}"
+            if events:
+                outcome.answer = f"你家这台设备的历史记录：{_format_event(events[0])}"
+            else:
+                outcome.answer = f"资料库里找到这段说明：{hits[0][1]}"
             outcome.degraded = True
         else:
             outcome.answer = answer

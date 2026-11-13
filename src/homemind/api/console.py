@@ -45,6 +45,7 @@ from .events import (  # noqa: E402
 from ..auth.family_store import VALID_ACTIONS, get_family, get_scene_store
 from .auth import get_account_store
 from ..core.trace import get_logger, new_trace_id, set_trace_id
+from ..core.metrics import get_usage_stats
 from ..memory.service import get_memory_service
 from ..memory.knowledge_store import get_knowledge_store
 from ..memory.short_term import get_short_term_memory
@@ -52,6 +53,10 @@ from ..tools.calendar_server import delete_schedule, get_schedules, reset_schedu
 from ..core.tenancy import DEFAULT_FAMILY_ID, FAMILY_ARG
 from ..tools.device_server import devices_of, get_device_states
 from ..tools.device_store import DEVICE_TYPES, get_device_store
+from ..tools.device_event_store import (
+    EVENT_TYPES,
+    get_device_event_store,
+)
 from ..tools.registry import default_registry, tool_succeeded
 
 logger = get_logger("api.console")
@@ -1435,6 +1440,86 @@ def delete_knowledge(
     record_event(user.family_id, TYPE_SYSTEM, title="删除了一条说明书",
                  body=f"操作人：{user.name}", actor=user.name)
     return {"ok": True, "removed": doc_id}
+
+
+class DeviceEventRequest(BaseModel):
+    """记录一次设备事件（故障 / 维修 / 保养 / 更换）的请求。"""
+
+    device_id: str = Field(..., description="设备 ID，必须属于本家庭")
+    event_type: str = Field("fault", description="fault / repair / maintain / replace")
+    symptom: str = Field("", description="现象，例如「报 P4，不进水」")
+    cause: str = Field("", description="最终确认的原因")
+    action: str = Field("", description="处理动作")
+    cost: float | None = Field(None, description="花费金额，可选")
+    happened_at: float | None = Field(None, description="发生时间戳，不传则用当前时间")
+
+
+@router.get("/usage")
+def llm_usage(user: AuthUser = Depends(current_user)) -> dict[str, Any]:
+    """大模型 token 用量与成本估算。
+
+    token 数是真实 API 返回的 usage 累计（进程级，重启清零）；
+    成本按环境变量 `HM_LLM_INPUT_PRICE` / `HM_LLM_OUTPUT_PRICE` 估算，
+    **未配置时 `cost` 为 null，不编数字**。
+    """
+    return get_usage_stats()
+
+
+@router.get("/device-events")
+def list_device_events(
+    device_id: str = "",
+    limit: int = 50,
+    user: AuthUser = Depends(current_user),
+) -> dict[str, Any]:
+    """本家庭的设备事件历史，可按设备过滤。
+
+    知识问答的「上次这台是怎么修的」就是靠这张表答的——
+    说明书网上都有，这台机器的历史只有这里才有。
+    """
+    store = get_device_event_store()
+    limit = max(1, min(limit, 200))
+    events = (
+        store.list_for_device(user.family_id, device_id, limit=limit)
+        if device_id else store.list_all(user.family_id, limit=limit)
+    )
+    return {"events": events, "count": len(events), "types": EVENT_TYPES}
+
+
+@router.post("/device-events")
+def add_device_event(
+    req: DeviceEventRequest, user: AuthUser = Depends(current_user)
+) -> dict[str, Any]:
+    """记一条设备事件。
+
+    逐项校验设备归属：只校验 family_id 够不够？不够。设备 ID 是用户可
+    自由输入的字符串，不查库就等于允许往别人家的设备名下写事件。
+    """
+    device = get_device_store().get(user.family_id, req.device_id)
+    if device is None:
+        raise HTTPException(status_code=404, detail="这台设备不在你的家庭里")
+
+    if not (req.symptom or req.cause or req.action):
+        raise HTTPException(status_code=400, detail="现象、原因、处理动作至少写一项")
+
+    event_id = get_device_event_store().record(
+        user.family_id,
+        req.device_id,
+        event_type=req.event_type,
+        symptom=req.symptom.strip(),
+        cause=req.cause.strip(),
+        action=req.action.strip(),
+        cost=req.cost,
+        device_name=device.name,
+        happened_at=req.happened_at,
+    )
+    label = EVENT_TYPES.get(req.event_type, req.event_type)
+    record_event(
+        user.family_id, TYPE_DEVICE,
+        title=f"{device.name} 记录了一条{label}",
+        body=f"操作人：{user.name}",
+        actor=user.name,
+    )
+    return {"ok": True, "id": event_id}
 
 
 def mount_web(app: Any) -> None:
